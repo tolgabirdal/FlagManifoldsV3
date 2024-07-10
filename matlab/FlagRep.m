@@ -1,4 +1,4 @@
-function [X, n] = FlagRep(D, Aset)
+function [X, flag_type] = FlagRep(D, Aset)
 
 [n,~] = size(D);
 
@@ -15,7 +15,6 @@ Bset = {};
 Bset{1} = Aset{1};
 B = D(:,Bset{1});
 C = B;
-% P = eye(n) - C*inv(C'*C)*C';
 [U,S,~] = svd(C, "econ");
 X{1} = U(1:end,1:nnz(S>eps_rank));
 P = eye(n) - X{1}*X{1}';
@@ -29,7 +28,6 @@ for i=2:k
     Bset{i} = setdiff(Aset{i},Aset{i-1});
     B = D(:,Bset{i});
     C = P * B;
-    % P = (eye(n) - C*inv(C'*C)*C')*P;
     [U,S,~] = svd(C, "econ");
     X{i} = U(1:end,1:nnz(S>eps_rank));
     P = (eye(n) - X{i}*X{i}')*P;
@@ -40,4 +38,5 @@ end
 % note, in this case n = p
 X = cell2mat(X);
 
-n = cumsum(m);
+%compute the flag type (n_1,n_2,...,n_k)
+flag_type = cumsum(m);
