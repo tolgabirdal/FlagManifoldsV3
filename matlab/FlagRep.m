@@ -16,6 +16,7 @@ Bset{1} = Aset{1};
 B = D(:,Bset{1});
 C = B;
 [U,S,~] = svd(C, "econ");
+print(S)
 X{1} = U(1:end,1:nnz(S>eps_rank));
 P = eye(n) - X{1}*X{1}';
 
