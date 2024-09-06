@@ -39,7 +39,6 @@ def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8) -> tuple:
     B = D[:,Bset[0]]
     C = B
     U,S,_ = np.linalg.svd(C, full_matrices=False)
-    print(S)
     X.append(U[:,S>eps_rank])
     P = np.eye(n) - X[-1] @ X[-1].T
 
