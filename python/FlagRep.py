@@ -14,13 +14,25 @@ def chordal_distance(X, Y, Bs_x, Bs_y):
         Xi = X[:,id_x]
         Yi = Y[:,id_y]
         mm = np.min([len(Bs_x[i]), len(Bs_y[i])])
-        dist = dist + np.sqrt(mm - np.trace(Xi.T @ Yi @ Yi.T @ Xi))
+        sin_sq = mm - np.trace(Xi.T @ Yi @ Yi.T @ Xi)
+        if np.isclose(sin_sq,0):
+            sin_sq = 0
+        elif sin_sq < 0:
+            print('sine squared less than 0')
+            print(sin_sq)
+        
+        dist = dist + np.sqrt(sin_sq)
 
     return dist
 
 
 
+
 def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8) -> tuple:
+
+    '''
+    Maybe try to remove truncation.
+    '''
 
     n,_ = D.shape
 
@@ -54,6 +66,8 @@ def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8) -> tuple:
         B = D[:,Bset[i]]
         C = P @ B
         U,S,_ = np.linalg.svd(C, full_matrices=False)
+        # plt.figure()
+        # plt.plot(S)
         X.append(U[:,S>eps_rank])
         P = (np.eye(n) - X[-1] @ X[-1].T) @ P
         # m[i] = np.linalg.matrix_rank(C)

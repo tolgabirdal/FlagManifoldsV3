@@ -5,11 +5,13 @@ Algorthms for averaging on flags using chordal distance from  Pitival et al.
 '''
 
 import numpy as np
-import autograd.numpy as anp
 import pymanopt
 import pymanopt.manifolds
 import pymanopt.optimizers
 from RealFlag import RealFlag
+from collections import Counter
+
+
 
 def flag_mean(data: np.array, flag_type: list , weights: np.array = [], 
               initial_point: np.array = None, oriented = False, 
@@ -422,3 +424,125 @@ def lbg_flag(X: np.array, epsilon: float, centers: list = [],  n_centers: int = 
         errors.append(error)
 
     return centers, errors, distortions    
+
+
+def dynamic_flag_mean(data: np.array, flag_types: list, 
+              initial_point: np.array = None, oriented = False, 
+              verbosity: int = 0, return_all: bool = False):
+    '''
+    chordal flag mean on p flags living in n-space with flag type flag_type
+    Inputs:
+        data: np.array- n x k x p matrix of data on flag manifold
+        flag_types: list- list of type of flag for each point (eg. 1,2,3)
+        initial_point: np.array- initial point for trust regions solver
+        oriented: bool- True to compute oriented average, only for Flags of type (1,2,...,n-1;n)
+        verbosity: int- print out details from RTR
+        return_all: bool- True to return pymanopt object with cost, number of iterations, and more
+    Outputs:
+        the chordal flag mean with or without extra information
+    '''
+    n,k,p = data.shape
+
+    #construct weight matrix
+    # weight_mat = np.eye(p)
+    # if len(weights) > 0:
+    #      weight_mat[np.arange(p), np.arange(p)] = np.sqrt(weights)
+
+    # Most common fl_type
+    tuples = [tuple(sublist) for sublist in flag_types]
+    # Use Counter to count occurrences of each tuple
+    count = Counter(tuples)
+
+    # Find the most common tuple
+    most_common_tuple = count.most_common(1)[0][0]
+
+    # Convert it back to a list
+    mean_flag_type = list(most_common_tuple)
+
+    from IPython import embed; embed()
+    
+    p_mats_all = {}
+    for j,flag_type in enumerate(flag_types):
+        for i in range(len(flag_type)):
+            #set the initial f_type_prev to 0
+            f_type = flag_type[i]
+            if i-1 < 0:
+                f_type_prev = 0
+            else:
+                f_type_prev = flag_type[i-1]
+            
+            #make projection matrices
+            dim_d_mat = data[:,f_type_prev:f_type,j] #@ weight_mat
+            dim_d_mat = np.reshape(dim_d_mat, (n,(f_type-f_type_prev)))
+            p_mat = dim_d_mat @ dim_d_mat.T 
+            p_mats_all[(i,j)] = p_mat
+    
+    p_mats = []
+    for i in range(len(flag_types[0])):
+        p_mat = np.zeros((n,n))
+        for j in range(len(flag_types)):
+            p_mat += p_mats_all[(i,j)]
+        p_mats.append(p_mat)
+
+
+    id_mats = []
+    for i in range(len(mean_flag_type)):
+        #set the initial f_type_prev to 0
+        f_type = mean_flag_type[i]
+        if i-1 < 0:
+            f_type_prev = 0
+        else:
+            f_type_prev = mean_flag_type[i-1]
+
+        #make identity matrices
+        id_mat = np.zeros((k,k))
+        id_mat[np.arange(f_type_prev,f_type,1),np.arange(f_type_prev,f_type,1)] = 1
+        id_mats.append(id_mat)
+
+    
+
+    St = pymanopt.manifolds.stiefel.Stiefel(n,k)
+
+    #setu up the objective function
+    @pymanopt.function.autograd(St)
+    def cost(point):
+        f = 0
+        for i in np.arange(len(p_mats)):
+            if i < 1:
+                f_type_before = 0
+            else:
+                f_type_before = flag_type[i-1]
+
+            k_i = flag_type[i] - f_type_before
+            
+            f += p*k_i-np.trace(id_mats[i] @ point.T @ p_mats[i] @ point)
+
+        return f
+
+    problem = pymanopt.Problem(St, cost)
+
+    optimizer = pymanopt.optimizers.trust_regions.TrustRegions(verbosity = verbosity)
+
+    #run the trust regions algorithm
+    if initial_point is None:
+        mu = np.mean(data, axis = 2)
+        initial_point = np.linalg.qr(mu)[0][:,:flag_type[-1]]
+        result = optimizer.run(problem, initial_point = initial_point)
+    else:
+        result = optimizer.run(problem, initial_point = initial_point)
+    
+    f_mean = result.point
+
+    #make it an oriented flag mean
+    #this might only work for flag types FL(1,2,3,...,n-1;n)
+    if oriented:
+        euclidean_mean = np.mean(data, axis = 2)
+        for i in range(k):
+            cos_theta = np.dot(euclidean_mean[:,i],f_mean[:,i])
+            if cos_theta < 0:
+                f_mean[:,i] = -f_mean[:,i]
+    
+    if not return_all:
+        return f_mean, mean_flag_type
+    else:
+        return result
