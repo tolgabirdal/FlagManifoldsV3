@@ -26,9 +26,27 @@ def chordal_distance(X, Y, Bs_x, Bs_y):
     return dist
 
 
+def truncate_svd(C: np.array, eps_rank: float, zero_tol:float) -> np.array:
+    U,S,_ = np.linalg.svd(C, full_matrices=False)
+
+    # try 1
+    # nnz_ids = ~np.isclose(S, 0, atol=zero_tol)
+    # S = S[nnz_ids]
+    # U = U[:,nnz_ids]
+    # s_prop = np.cumsum(S**2)/np.sum(S**2)
+    # good_idx = s_prop<=eps_rank
+
+    #try 2 a la https://arxiv.org/pdf/1305.5870
+    m, n = C.shape
+    beta = m/n
+    lambda_ast = np.sqrt(2*(beta+1) + 8*beta/(beta + 1 + np.sqrt(beta**2 + 14*beta + 1)))
+    cutoff = lambda_ast*np.sqrt(n)
+    good_idx = S >= cutoff
+
+    return U[:,good_idx]
 
 
-def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8) -> tuple:
+def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8, zero_tol: float = 1e-8) -> tuple:
 
     '''
     Maybe try to remove truncation.
@@ -50,12 +68,10 @@ def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8) -> tuple:
     Bset.append(Aset[0])
     B = D[:,Bset[0]]
     C = B
-    U,S,_ = np.linalg.svd(C, full_matrices=False)
-    X.append(U[:,S>eps_rank])
+    U = truncate_svd(C, eps_rank, zero_tol)
+    X.append(U)
     P = np.eye(n) - X[-1] @ X[-1].T
-
     m = np.zeros((k,1))
-
     # m[0] = np.linalg.matrix_rank(C)
     m[0] = X[-1].shape[1]
 
@@ -65,18 +81,24 @@ def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8) -> tuple:
         Bset.append(np.setdiff1d(Aset[i],Aset[i-1]))
         B = D[:,Bset[i]]
         C = P @ B
-        U,S,_ = np.linalg.svd(C, full_matrices=False)
-        # plt.figure()
-        # plt.plot(S)
-        X.append(U[:,S>eps_rank])
-        P = (np.eye(n) - X[-1] @ X[-1].T) @ P
-        # m[i] = np.linalg.matrix_rank(C)
-        m[i] = X[-1].shape[1]
+        C[np.isclose(C, 0, atol=zero_tol)] = 0
+        if np.all(C == 0):
+            m[i] = 0
+        else:
+            U = truncate_svd(C, eps_rank, zero_tol)
+            X.append(U)
+            P = (np.eye(n) - X[-1] @ X[-1].T) @ P
+            # m[i] = np.linalg.matrix_rank(C)
+            m[i] = X[-1].shape[1]
 
     # translate to stiefel manifold representative n x n_k
     X = np.hstack(X)
+    if X.shape[1] > n:
+        print(f'error {np.cumsum(m).astype(int)}')
+        X = X[:,:n]
 
     # compute the flag type (n_1,n_2,...,n_k)
+    m = m[m != 0] # remove 0s
     flag_type = np.cumsum(m).astype(int)
 
     return X, flag_type
