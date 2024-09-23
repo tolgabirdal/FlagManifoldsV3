@@ -30,20 +30,27 @@ def truncate_svd(C: np.array, eps_rank: float, zero_tol:float) -> np.array:
     U,S,_ = np.linalg.svd(C, full_matrices=False)
 
     # try 1
+    nnz_ids = ~np.isclose(S, 0, atol=zero_tol)
+    S = S[nnz_ids]
+    U = U[:,nnz_ids]
+    s_prop = np.cumsum(S**2)/np.sum(S**2)
+    good_idx = s_prop<=eps_rank
+    U = U[:,good_idx]
+
+    # try 2 a la https://arxiv.org/pdf/1305.5870
+    # m, n = C.shape
+    # beta = m/n
+    # lambda_ast = np.sqrt(2*(beta+1) + 8*beta/(beta + 1 + np.sqrt(beta**2 + 14*beta + 1)))
+    # cutoff = lambda_ast*np.sqrt(n)
+    # good_idx = S >= cutoff
+    # U[:,good_idx]
+
+    # try 3
     # nnz_ids = ~np.isclose(S, 0, atol=zero_tol)
     # S = S[nnz_ids]
     # U = U[:,nnz_ids]
-    # s_prop = np.cumsum(S**2)/np.sum(S**2)
-    # good_idx = s_prop<=eps_rank
 
-    #try 2 a la https://arxiv.org/pdf/1305.5870
-    m, n = C.shape
-    beta = m/n
-    lambda_ast = np.sqrt(2*(beta+1) + 8*beta/(beta + 1 + np.sqrt(beta**2 + 14*beta + 1)))
-    cutoff = lambda_ast*np.sqrt(n)
-    good_idx = S >= cutoff
-
-    return U[:,good_idx]
+    return U
 
 
 def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8, zero_tol: float = 1e-8) -> tuple:

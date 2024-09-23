@@ -143,7 +143,7 @@ def extract_patches(data, labels, patch_size, class_ids, feats = 'pixels'):
     return mod_data, mod_labels, Aset
 
 
-def baseline_visuals(mod_data, mod_labels, class_names, colors):
+def baseline_visuals(mod_data, mod_labels, class_names):
     #visualizations
 
     pca = PCA(n_components = 2)
@@ -151,23 +151,23 @@ def baseline_visuals(mod_data, mod_labels, class_names, colors):
 
     plt.figure()
     unique_labels = np.unique(mod_labels)
-    for i, l in enumerate(unique_labels):
+    for l in unique_labels:
         idx = np.where(mod_labels == l)
-        plt.scatter(vis_data_pca[idx,0], vis_data_pca[idx,1], alpha=.5, label = class_names[l], c= colors[i])
+        plt.scatter(vis_data_pca[idx,0], vis_data_pca[idx,1], alpha=.5, label = class_names[l])
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.xlabel('PC1')
     plt.ylabel('PC2')
     plt.tight_layout()
     plt.show()
 
-    tsne = TSNE(n_components = 2, init = "random", random_state = 10, perplexity = np.min([len(mod_labels)-1, 30]))
+    tsne = TSNE(n_components = 2, init = "random", random_state = 10)
     vis_data_tsne = tsne.fit_transform(np.vstack([m.flatten() for m in mod_data]))
 
     plt.figure()
     unique_labels = np.unique(mod_labels)
-    for i,l in enumerate(unique_labels):
+    for l in unique_labels:
         idx = np.where(mod_labels == l)
-        plt.scatter(vis_data_tsne[idx,0], vis_data_tsne[idx,1], alpha=.5, label = class_names[l], c= colors[i])
+        plt.scatter(vis_data_tsne[idx,0], vis_data_tsne[idx,1], alpha=.5, label = class_names[l])
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.xlabel('t-SNE1')
     plt.ylabel('t-SNE2')
@@ -175,24 +175,7 @@ def baseline_visuals(mod_data, mod_labels, class_names, colors):
     plt.show()
 
 if __name__ == '__main__':
-
-    data = scipy.io.loadmat('../data/KSC/KSC_corrected.mat')['KSC']
-    labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
-    class_names = {1: 'Scrub',
-                2: 'Willow swamp',
-                3: 'Cabbage palm hammock',
-                4: 'Cabbage palm/oak hammock',
-                5: 'Slash pine',
-                6: 'Oak/broad leaf hammock',
-                7: 'Hardwood swamp',
-                8: 'Graminoid marsh',
-                9: 'Spartina marsh',
-                10: 'Cattail marsh',
-                11: 'Salt marsh',
-                12: 'Mudflats',
-                13: 'Water'}
-    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12]#[8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
-
+    # Load the hyperspectral image and ground truth
     # data = sio.loadmat('../data/indian_pines/Indian_pines.mat')['indian_pines']  
     # labels = sio.loadmat('../data/indian_pines/Indian_pines_gt.mat')['indian_pines_gt']  
     # class_names = {1: 'Alfalfa',
@@ -212,6 +195,7 @@ if __name__ == '__main__':
     #             15: 'Buildings-Grass-Trees-Drives',
     #             16: 'Stone-Steel-Towers'}
     # class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+
     # data = sio.loadmat('../data/Salinas/Salinas.mat')['salinas']  
     # labels = sio.loadmat('../data/Salinas/Salinas_gt.mat')['salinas_gt']  
     # class_names = {
@@ -233,33 +217,37 @@ if __name__ == '__main__':
     #     16: "Vinyard_vertical_trellis"
     #         }
     # class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+    # patch_size = 9 #works
+    # k_values = [1, 2, 3, 4, 5]
+    # cutoff = 1
+
+    data = scipy.io.loadmat('../data/KSC/KSC.mat')['KSC']
+    labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
+    class_names = {1: 'Scrub',
+                2: 'Willow swamp',
+                3: 'Cabbage palm hammock',
+                4: 'Cabbage palm/oak hammock',
+                5: 'Slash pine',
+                6: 'Oak/broad leaf hammock',
+                7: 'Hardwood swamp',
+                8: 'Graminoid marsh',
+                9: 'Spartina marsh',
+                10: 'Cattail marsh',
+                11: 'Salt marsh',
+                12: 'Mudflats',
+                13: 'Water'}
+    class_ids = [1,6,7,8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
+    # patch_size = 3
+    # k_values = [1, 2, 3, 4, 5]
+    # cutoff = .95
 
     patch_size = 3
     k_values = [1,3,5,7,9,11,13,15]
     cutoff = 1
 
-    n_trials = 20
-
-    colors = [
-        "#1f77b4",  # Blue
-        "#ff7f0e",  # Orange
-        "#2ca02c",  # Green
-        "#d62728",  # Red
-        "#9467bd",  # Purple
-        "#8c564b",  # Brown
-        "#e377c2",  # Pink
-        "#7f7f7f",  # Gray
-        "#bcbd22",  # Yellow-Green
-        "#17becf",  # Teal
-        "#aec7e8",  # Light Blue
-        "#ffbb78",  # Light Orange
-        "#98df8a",  # Light Green
-        "#ff9896",  # Light Red
-        "#c5b0d5",  # Light Purple
-        "#c49c94",  # Light Brown
-    ]
-
     methods = ['FlagRep', 'SVD', 'QR', 'Euclidean']
+
+  
 
     dist_mats = {}
     flag_data = {}
@@ -267,9 +255,9 @@ if __name__ == '__main__':
     
     mod_data, mod_labels, Aset = extract_patches(data, labels, patch_size, class_ids, feats = 'pixels')
 
-    baseline_visuals(mod_data, mod_labels, class_names, colors)
 
     n,p = mod_data[0].shape
+    fl_type_easy = [a[-1]+1 for a in Aset]#[i for i in range(np.min([n,p]))]
     n_pts = len(mod_data)
 
     for method_name in methods:
@@ -285,14 +273,12 @@ if __name__ == '__main__':
                     print(np.linalg.matrix_rank(pt))
             elif method_name == 'SVD':
                 flag_pt = truncate_svd(pt, eps_rank = cutoff, zero_tol=1e-8)
-                flag_types[method_name].append([1,flag_pt.shape[1]])
+                flag_types[method_name].append([flag_pt.shape[1]])
             elif method_name == 'QR':
                 Q,_ = np.linalg.qr(pt)
                 rank_pt = np.linalg.matrix_rank(pt)
                 flag_pt = Q[:,:rank_pt]
-                flag_types[method_name].append([1,flag_pt.shape[1]])
-                if f_type[-1]< pt.shape[1]:
-                    print(np.linalg.matrix_rank(pt))
+                flag_types[method_name].append([i for i in range(1,rank_pt+1)])
             elif method_name == 'Euclidean':
                 flag_pt = flag_pt.flatten()
             flag_data[method_name].append(flag_pt)
@@ -321,13 +307,13 @@ if __name__ == '__main__':
 
     fig,ax = plt.subplots(1,3, figsize = (25,5))
     for i, method_name in enumerate(methods[:-1]):
-        tsne = TSNE(n_components=2,metric='precomputed', init = "random", random_state = 10, perplexity= np.min([len(mod_labels)-1, 30]))
+        tsne = TSNE(n_components=2,metric='precomputed', init = "random", random_state = 10)
         vis_data = tsne.fit_transform(dist_mats[method_name])
 
         unique_labels = np.unique(mod_labels)
-        for j,l in enumerate(unique_labels):
+        for l in unique_labels:
             idx = np.where(mod_labels == l)
-            ax[i].scatter(vis_data[idx,0], vis_data[idx,1], alpha=.5, label = class_names[l], c = colors[j])
+            ax[i].scatter(vis_data[idx,0], vis_data[idx,1], alpha=.5, label = class_names[l])
         ax[i].set_xlabel('t-SNE1')
         ax[i].set_title(method_name)
     ax[0].set_ylabel('t-SNE2')
@@ -342,7 +328,7 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    for s in range(n_trials):
+    for s in range(20):
 
         # Step 2: Perform train-test split based on labels using the indices
         train_indices, test_indices, _, _ = train_test_split(indices, mod_labels, test_size=0.3, stratify=mod_labels, random_state=s)
