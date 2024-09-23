@@ -26,7 +26,7 @@ def chordal_distance(X, Y, Bs_x, Bs_y):
     return dist
 
 
-def truncate_svd(C: np.array, eps_rank: float, zero_tol:float) -> np.array:
+def truncate_svd(C: np.array, eps_rank: float = 1e-8, zero_tol: float = 1e-8) -> np.array:
     U,S,_ = np.linalg.svd(C, full_matrices=False)
 
     # try 1

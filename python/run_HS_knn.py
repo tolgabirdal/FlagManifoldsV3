@@ -11,7 +11,6 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
 
-import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 
@@ -28,7 +27,7 @@ def make_Bs(fl_type):
         Bs.append(np.arange(fl_type[i-1],fl_type[i]))
     return Bs
 
-#Train and evaluate kNN classifier with precomputed distances
+
 def evaluate_knn_with_distances(distance_matrix_train, distance_matrix_test, y_train, y_test, k_values):
     accuracies = []
     for k in k_values:
@@ -42,13 +41,14 @@ def evaluate_knn_with_distances(distance_matrix_train, distance_matrix_test, y_t
         
         # Calculate accuracy
         accuracy = accuracy_score(y_test, y_pred)
-        print(f"k={k}, Accuracy: {accuracy:.4f}")
+        # print(f"k={k}, Accuracy: {accuracy:.4f}")
         accuracies.append(accuracy)
     
     return accuracies
 
-#Train and evaluate kNN classifier with precomputed distances
+
 def evaluate_knn(data_train, data_test, y_train, y_test, k_values):
+    accuracies = []
     for k in k_values:
         knn = KNeighborsClassifier(n_neighbors=k)
         
@@ -60,7 +60,10 @@ def evaluate_knn(data_train, data_test, y_train, y_test, k_values):
         
         # Calculate accuracy
         accuracy = accuracy_score(y_test, y_pred)
-        print(f"k={k}, Accuracy: {accuracy:.4f}")
+        # print(f"k={k}, Accuracy: {accuracy:.4f}")
+        accuracies.append(accuracy)
+    return accuracies
+
 
 def extract_patches_of_class(data, labels, patch_size, target_class):
     """
@@ -134,17 +137,23 @@ def extract_patches(data, labels, patch_size, class_ids, feats = 'pixels'):
             if feats == 'pixels':
                 Aset = [np.arange(i) for i in change_indices]
             elif feats == 'bands':
-                Aset = [np.arange(10),np.arange(30),np.arange(80)]
-        
+                # Aset = [np.arange(10),np.arange(30),np.arange(80)]
+                # Aset = [np.arange(20,30),np.arange(20,40)]
+                Aset = [np.array([14]), np.array([14,24,37,100,110,120])]
         else:
             print(f'No patches of class id {target_class}')
 
+    
         print(f"Extracted {len(patches)} patches where all pixels are of class {class_names[target_class]}. Each patch has shape {patch_size}.")
+
     return mod_data, mod_labels, Aset
 
 
-def baseline_visuals(mod_data, mod_labels, class_names, colors):
+def baseline_visuals(mod_data, mod_labels, class_names, colors, Aset):
+
+    mod_data = [m[:,Aset[-1]] for m in mod_data]
     #visualizations
+    print(mod_data[0].shape)
 
     pca = PCA(n_components = 2)
     vis_data_pca = pca.fit_transform(np.vstack([m.flatten() for m in mod_data]))
@@ -191,7 +200,7 @@ if __name__ == '__main__':
                 11: 'Salt marsh',
                 12: 'Mudflats',
                 13: 'Water'}
-    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12]#[8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
+    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12]#[8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
 
     # data = sio.loadmat('../data/indian_pines/Indian_pines.mat')['indian_pines']  
     # labels = sio.loadmat('../data/indian_pines/Indian_pines_gt.mat')['indian_pines_gt']  
@@ -235,10 +244,10 @@ if __name__ == '__main__':
     # class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
 
     patch_size = 3
-    k_values = [1,3,5,7,9,11,13,15]
+    k_values = [1,3,5,7,9,11,13,15,17,19]
     cutoff = 1
 
-    n_trials = 20
+    n_trials = 100
 
     colors = [
         "#1f77b4",  # Blue
@@ -267,7 +276,7 @@ if __name__ == '__main__':
     
     mod_data, mod_labels, Aset = extract_patches(data, labels, patch_size, class_ids, feats = 'pixels')
 
-    baseline_visuals(mod_data, mod_labels, class_names, colors)
+    baseline_visuals(mod_data, mod_labels, class_names, colors, Aset)
 
     n,p = mod_data[0].shape
     n_pts = len(mod_data)
@@ -281,12 +290,14 @@ if __name__ == '__main__':
             if method_name == 'FlagRep':
                 flag_pt, f_type = FlagRep(pt, Aset, eps_rank = cutoff, zero_tol=1e-8)
                 flag_types[method_name].append(f_type)
-                if f_type[-1]< pt.shape[1]:
-                    print(np.linalg.matrix_rank(pt))
+                # if f_type[-1]< pt.shape[1]:
+                #     print(np.linalg.matrix_rank(pt))
             elif method_name == 'SVD':
+                pt = pt[:,Aset[-1]]
                 flag_pt = truncate_svd(pt, eps_rank = cutoff, zero_tol=1e-8)
                 flag_types[method_name].append([1,flag_pt.shape[1]])
             elif method_name == 'QR':
+                pt = pt[:,Aset[-1]]
                 Q,_ = np.linalg.qr(pt)
                 rank_pt = np.linalg.matrix_rank(pt)
                 flag_pt = Q[:,:rank_pt]
@@ -294,8 +305,17 @@ if __name__ == '__main__':
                 if f_type[-1]< pt.shape[1]:
                     print(np.linalg.matrix_rank(pt))
             elif method_name == 'Euclidean':
+                pt = pt[:,Aset[-1]]
                 flag_pt = flag_pt.flatten()
             flag_data[method_name].append(flag_pt)
+
+        if method_name == 'FlagRep':
+            smallest_dim = np.min([t[-1] for t in flag_types['FlagRep']])
+            flag_types['FlagRep'] = [np.array([t[0],smallest_dim]) for t in flag_types['FlagRep']]        
+        elif method_name == 'SVD':
+            smallest_dim = np.min([t[-1] for t in flag_types['SVD']])
+            flag_types['SVD'] = [np.array([t[0],smallest_dim]) for t in flag_types['SVD']]
+        
             
         #make distance matrices
         dist_mats[method_name] = np.zeros((n_pts,n_pts))
