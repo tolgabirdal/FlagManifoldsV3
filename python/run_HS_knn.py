@@ -185,8 +185,13 @@ def baseline_visuals(mod_data, mod_labels, class_names, colors, Aset):
 
 if __name__ == '__main__':
 
-    data = scipy.io.loadmat('../data/KSC/KSC_corrected.mat')['KSC']
+    data = scipy.io.loadmat('../data/KSC/KSC.mat')['KSC']
     labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
+
+    plt.figure()
+    plt.imshow(labels)
+    plt.colorbar()
+
     class_names = {1: 'Scrub',
                 2: 'Willow swamp',
                 3: 'Cabbage palm hammock',
@@ -200,7 +205,7 @@ if __name__ == '__main__':
                 11: 'Salt marsh',
                 12: 'Mudflats',
                 13: 'Water'}
-    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12]#[8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
+    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13]#[1,2,3,4,5,6,7,8,9,10,11,12]#[8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
 
     # data = sio.loadmat('../data/indian_pines/Indian_pines.mat')['indian_pines']  
     # labels = sio.loadmat('../data/indian_pines/Indian_pines_gt.mat')['indian_pines_gt']  
@@ -244,7 +249,7 @@ if __name__ == '__main__':
     # class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
 
     patch_size = 3
-    k_values = [1,3,5,7,9,11,13,15,17,19]
+    k_values = [1,5,9,13,17,21]
     cutoff = 1
 
     n_trials = 100
@@ -369,7 +374,7 @@ if __name__ == '__main__':
 
         # Step 3: Use these indices to retrieve the corresponding data and labels
         # (This step assumes `data` is an array of the same length as `labels`)
-        for method_name in methods:
+        for method_name in methods[:-1]:
 
             distance_matrix_train = dist_mats[method_name][train_indices,:][:,train_indices]
             distance_matrix_test = dist_mats[method_name][test_indices,:][:,train_indices]
@@ -385,6 +390,7 @@ if __name__ == '__main__':
                                 data = [[k, method_name, acc, s]])
                 results = pd.concat([results,res])
 
-
+    plt.figure(figsize = (9,3))
     sns.boxplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
-    plt.show()
+    plt.tight_layout()
+    plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
