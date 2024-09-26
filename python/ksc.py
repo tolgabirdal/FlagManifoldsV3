@@ -95,11 +95,11 @@ def extract_patches_of_class(data, labels, patch_size, target_class):
     return np.array(patches), np.array(patch_labels)
 
 
-def extract_patches(data, labels, patch_size, class_ids, feats = 'pixels'):
+def extract_patches(data, labels, patch_size, class_ids):
     # extract patches
     mod_data = []
     mod_labels = []
-    for target_class in class_ids:#[1,2,3,4,5,6,7,8,9,10,11,12,13]: #[8,10,11,14]:#[8,10,11,14]:#:
+    for target_class in class_ids:
         patches, patch_labels = extract_patches_of_class(data, labels, patch_size, target_class)
         if len(patches) > 0:
             flat_patches = []
@@ -118,10 +118,7 @@ def extract_patches(data, labels, patch_size, class_ids, feats = 'pixels'):
 
                 # Create the 2D array by unwrapping the 3D array based on sorted coordinates
                 flat_patch = np.array([array_3d[x, y, :] for x, y, _ in sorted_coords])
-                if feats == 'bands':
-                    flat_patches.append(flat_patch)
-                elif feats == 'pixels':
-                    flat_patches.append(flat_patch.T)
+                flat_patches.append(flat_patch.T)
 
                 # Create a hierarchy vector containing the Chebyshev distances in the same sorted order
                 hierarchy_vector = np.array([distance for _, _, distance in sorted_coords])
@@ -134,12 +131,8 @@ def extract_patches(data, labels, patch_size, class_ids, feats = 'pixels'):
             
             mod_data += flat_patches
 
-            if feats == 'pixels':
-                Aset = [np.arange(i) for i in change_indices]
-            elif feats == 'bands':
-                # Aset = [np.arange(10),np.arange(30),np.arange(80)]
-                # Aset = [np.arange(20,30),np.arange(20,40)]
-                Aset = [np.array([14]), np.array([14,24,37,100,110,120])]
+            Aset = [np.arange(i) for i in change_indices]
+
         else:
             print(f'No patches of class id {target_class}')
 
@@ -149,48 +142,15 @@ def extract_patches(data, labels, patch_size, class_ids, feats = 'pixels'):
     return mod_data, mod_labels, Aset
 
 
-def baseline_visuals(mod_data, mod_labels, class_names, colors, Aset):
-
-    mod_data = [m[:,Aset[-1]] for m in mod_data]
-    #visualizations
-    print(mod_data[0].shape)
-
-    pca = PCA(n_components = 2)
-    vis_data_pca = pca.fit_transform(np.vstack([m.flatten() for m in mod_data]))
-
-    plt.figure()
-    unique_labels = np.unique(mod_labels)
-    for i, l in enumerate(unique_labels):
-        idx = np.where(mod_labels == l)
-        plt.scatter(vis_data_pca[idx,0], vis_data_pca[idx,1], alpha=.5, label = class_names[l], c= colors[i])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xlabel('PC1')
-    plt.ylabel('PC2')
-    plt.tight_layout()
-    plt.show()
-
-    tsne = TSNE(n_components = 2, init = "random", random_state = 10, perplexity = np.min([len(mod_labels)-1, 30]))
-    vis_data_tsne = tsne.fit_transform(np.vstack([m.flatten() for m in mod_data]))
-
-    plt.figure()
-    unique_labels = np.unique(mod_labels)
-    for i,l in enumerate(unique_labels):
-        idx = np.where(mod_labels == l)
-        plt.scatter(vis_data_tsne[idx,0], vis_data_tsne[idx,1], alpha=.5, label = class_names[l], c= colors[i])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xlabel('t-SNE1')
-    plt.ylabel('t-SNE2')
-    plt.tight_layout()
-    plt.show()
-
 if __name__ == '__main__':
 
     data = scipy.io.loadmat('../data/KSC/KSC.mat')['KSC']
     labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
 
     plt.figure()
-    plt.imshow(labels)
-    plt.colorbar()
+    plt.imshow(data[:,:,40], cmap = 'grey')
+    plt.axis('off')
+    plt.savefig('../results/KSC_1band.pdf', bbox_inches = 'tight')
 
     class_names = {1: 'Scrub',
                 2: 'Willow swamp',
@@ -205,51 +165,10 @@ if __name__ == '__main__':
                 11: 'Salt marsh',
                 12: 'Mudflats',
                 13: 'Water'}
-    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13]#[1,2,3,4,5,6,7,8,9,10,11,12]#[8,9,10,11,12]#[1,2,3,4,5,6,7,8,9,10,11,12,13]
-
-    # data = sio.loadmat('../data/indian_pines/Indian_pines.mat')['indian_pines']  
-    # labels = sio.loadmat('../data/indian_pines/Indian_pines_gt.mat')['indian_pines_gt']  
-    # class_names = {1: 'Alfalfa',
-    #             2: 'Corn-notill',
-    #             3: 'Corn-mitill',
-    #             4: 'Corn',
-    #             5: 'Grass-pasture',
-    #             6: 'Grass-trees',
-    #             7: 'Grass-pasture-mowed',
-    #             8: 'Hay-windrowed',
-    #             9: 'Oats',
-    #             10: 'Soybean-notill',
-    #             11: 'Soybean-mitill',
-    #             12: 'Soybean-clean',
-    #             13: 'Wheat',
-    #             14: 'Woods',
-    #             15: 'Buildings-Grass-Trees-Drives',
-    #             16: 'Stone-Steel-Towers'}
-    # class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
-    # data = sio.loadmat('../data/Salinas/Salinas.mat')['salinas']  
-    # labels = sio.loadmat('../data/Salinas/Salinas_gt.mat')['salinas_gt']  
-    # class_names = {
-    #     1: "Brocoli_green_weeds_1",
-    #     2: "Brocoli_green_weeds_2",
-    #     3: "Fallow",
-    #     4: "Fallow_rough_plow",
-    #     5: "Fallow_smooth",
-    #     6: "Stubble",
-    #     7: "Celery",
-    #     8: "Grapes_untrained",
-    #     9: "Soil_vinyard_develop",
-    #     10: "Corn_senesced_green_weeds",
-    #     11: "Lettuce_romaine_4wk",
-    #     12: "Lettuce_romaine_5wk",
-    #     13: "Lettuce_romaine_6wk",
-    #     14: "Lettuce_romaine_7wk",
-    #     15: "Vinyard_untrained",
-    #     16: "Vinyard_vertical_trellis"
-    #         }
-    # class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+    class_ids = [1,2,3,4,5,6,7,8,9,10,11,12,13]
 
     patch_size = 3
-    k_values = [1,5,9,13,17,21]
+    k_values = np.arange(1,25)
     cutoff = 1
 
     n_trials = 100
@@ -273,15 +192,13 @@ if __name__ == '__main__':
         "#c49c94",  # Light Brown
     ]
 
-    methods = ['FlagRep', 'SVD', 'QR', 'Euclidean']
+    methods = ['FlagRep', 'QR', 'SVD',  'Euclidean']
 
     dist_mats = {}
     flag_data = {}
     flag_types = {}
     
-    mod_data, mod_labels, Aset = extract_patches(data, labels, patch_size, class_ids, feats = 'pixels')
-
-    baseline_visuals(mod_data, mod_labels, class_names, colors, Aset)
+    mod_data, mod_labels, Aset = extract_patches(data, labels, patch_size, class_ids)
 
     n,p = mod_data[0].shape
     n_pts = len(mod_data)
@@ -295,8 +212,6 @@ if __name__ == '__main__':
             if method_name == 'FlagRep':
                 flag_pt, f_type = FlagRep(pt, Aset, eps_rank = cutoff, zero_tol=1e-8)
                 flag_types[method_name].append(f_type)
-                # if f_type[-1]< pt.shape[1]:
-                #     print(np.linalg.matrix_rank(pt))
             elif method_name == 'SVD':
                 pt = pt[:,Aset[-1]]
                 flag_pt = truncate_svd(pt, eps_rank = cutoff, zero_tol=1e-8)
@@ -307,8 +222,6 @@ if __name__ == '__main__':
                 rank_pt = np.linalg.matrix_rank(pt)
                 flag_pt = Q[:,:rank_pt]
                 flag_types[method_name].append([1,flag_pt.shape[1]])
-                if f_type[-1]< pt.shape[1]:
-                    print(np.linalg.matrix_rank(pt))
             elif method_name == 'Euclidean':
                 pt = pt[:,Aset[-1]]
                 flag_pt = flag_pt.flatten()
@@ -344,29 +257,6 @@ if __name__ == '__main__':
     indices = np.arange(len(mod_labels))
     mod_labels = np.array(mod_labels)
 
-    fig,ax = plt.subplots(1,3, figsize = (25,5))
-    for i, method_name in enumerate(methods[:-1]):
-        tsne = TSNE(n_components=2,metric='precomputed', init = "random", random_state = 10, perplexity= np.min([len(mod_labels)-1, 30]))
-        vis_data = tsne.fit_transform(dist_mats[method_name])
-
-        unique_labels = np.unique(mod_labels)
-        for j,l in enumerate(unique_labels):
-            idx = np.where(mod_labels == l)
-            ax[i].scatter(vis_data[idx,0], vis_data[idx,1], alpha=.5, label = class_names[l], c = colors[j])
-        ax[i].set_xlabel('t-SNE1')
-        ax[i].set_title(method_name)
-    ax[0].set_ylabel('t-SNE2')
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.tight_layout()
-    plt.show()
-
-    fig,ax = plt.subplots(1,3)
-    for i, method_name in enumerate(methods[:-1]):
-        ax[i].imshow(dist_mats[method_name], cmap = 'Greys')
-        ax[i].set_title(method_name)
-    plt.tight_layout()
-    plt.show()
-
     for s in range(n_trials):
 
         # Step 2: Perform train-test split based on labels using the indices
@@ -391,6 +281,8 @@ if __name__ == '__main__':
                 results = pd.concat([results,res])
 
     plt.figure(figsize = (9,3))
-    sns.boxplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
+    sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
     plt.tight_layout()
     plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
+
+
