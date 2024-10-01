@@ -15,7 +15,7 @@ from sklearn.metrics import cluster, pairwise_distances, normalized_mutual_info_
 
 from tqdm import tqdm
 
-from FlagRep import FlagRep, truncate_svd, chordal_distance
+from FlagRep0 import FlagRep, truncate_svd, chordal_distance
 
 
 

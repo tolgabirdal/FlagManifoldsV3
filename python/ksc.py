@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import scipy.io as sio
 
-from FlagRep import FlagRep, chordal_distance, truncate_svd
+from FlagRep0 import FlagRep, chordal_distance, truncate_svd
 
 from matplotlib import pyplot as plt
 

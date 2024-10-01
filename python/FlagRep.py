@@ -1,111 +1,131 @@
 import numpy as np
-import scipy
 from matplotlib import pyplot as plt
+from sklearn.base import BaseEstimator
 
-def chordal_distance(X, Y, Bs_x, Bs_y):
+class FlagRep(BaseEstimator):
+    def __init__(self, Aset: list = [], eps_rank: float = 1, zero_tol: float = 1e-8):
+        self.Aset_ = Aset
+        self.eps_rank_ = eps_rank
+        self.zero_tol_ = zero_tol
 
-    k = len(Bs_x)
+        # saving new flag type
+        self.flag_type_ = []
 
-    dist = 0
+        # #saving truncated Vh's and S's from SVD
+        # self.Ss_ = []
+        # self.Vhs_ = []
+        self.D_ = np.array([])
 
-    for i in range(k):
-        id_x = Bs_x[i]
-        id_y = Bs_y[i]
-        Xi = X[:,id_x]
-        Yi = Y[:,id_y]
-        mm = np.min([len(Bs_x[i]), len(Bs_y[i])])
-        sin_sq = mm - np.trace(Xi.T @ Yi @ Yi.T @ Xi)
-        if np.isclose(sin_sq,0):
-            sin_sq = 0
-        elif sin_sq < 0:
-            print('sine squared less than 0')
-            print(sin_sq)
+    def flag_type(self):
+        return self.flag_type_
+
+    def fit_transform(self, D):
+        """
+        Apply the transformation to the data.
+
+        Parameters:
+        D: array-like, shape (n_samples, n_features)
+            The input data to transform.
+
+        Returns:
+        X: array-like, shape (n_samples, n_features)
+            Transformed version of the input data.
+        """
+        self.D_ = D
+
+        self.n_,self.p_ = self.D_.shape
         
-        dist = dist + np.sqrt(sin_sq)
-
-    return dist
 
 
-def truncate_svd(C: np.array, eps_rank: float = 1e-8, zero_tol: float = 1e-8) -> np.array:
-    U,S,_ = np.linalg.svd(C, full_matrices=False)
+        # output flag
+        X = []
 
-    # try 1
-    nnz_ids = ~np.isclose(S, 0, atol=zero_tol)
-    S = S[nnz_ids]
-    U = U[:,nnz_ids]
-    s_prop = np.cumsum(S**2)/np.sum(S**2)
-    good_idx = s_prop<=eps_rank
-    U = U[:,good_idx]
+        # get the number of As
+        k = len(self.Aset_)
 
-    # try 2 a la https://arxiv.org/pdf/1305.5870
-    # m, n = C.shape
-    # beta = m/n
-    # lambda_ast = np.sqrt(2*(beta+1) + 8*beta/(beta + 1 + np.sqrt(beta**2 + 14*beta + 1)))
-    # cutoff = lambda_ast*np.sqrt(n)
-    # good_idx = S >= cutoff
-    # U[:,good_idx]
+        # for feature indices
+        Bset = []
 
-    # try 3
-    # nnz_ids = ~np.isclose(S, 0, atol=zero_tol)
-    # S = S[nnz_ids]
-    # U = U[:,nnz_ids]
+        
+        # first part of the flag
+        Bset.append(self.Aset_[0])
+        B = self.D_[:,Bset[0]]
+        C = B
 
-    return U
+        U = self.truncate_svd(C)
+        X.append(U)
 
+        P = np.eye(self.n_) - X[-1] @ X[-1].T
+        m = np.zeros((k,1))
+        m[0] = X[-1].shape[1]
 
-def FlagRep(D: np.array, Aset: list, eps_rank: float = 1e-8, zero_tol: float = 1e-8) -> tuple:
+        # the rest of the flag
+        for i in range(1,k):
+            Bset.append(np.setdiff1d(self.Aset_[i],self.Aset_[i-1]))
+            B = self.D_[:,Bset[i]]
+            C = P @ B
+            C[np.isclose(C, 0, atol=self.zero_tol_)] = 0
+            if np.all(C == 0):
+                m[i] = 0
+            else:
+                U = self.truncate_svd(C)
+                X.append(U)
+                # self.Ss_.append(S)
+                # self.Vhs_.append(Vh)
 
-    '''
-    Maybe try to remove truncation.
-    '''
+                P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
+                m[i] = X[-1].shape[1]
 
-    n,_ = D.shape
+        # translate to stiefel manifold representative n x n_k
+        X = np.hstack(X)
+        if X.shape[1] > self.n_:
+            print(f'error {np.cumsum(m).astype(int)}')
+            X = X[:,:self.n_]
 
+        # compute the flag type (n_1,n_2,...,n_k)
+        m = m[m != 0] # remove 0s
+        self.flag_type_ = np.cumsum(m).astype(int)
 
-    # output flag
-    X = []
+        return X
 
-    # get the number of As
-    k = len(Aset)
+    def inverse_transform(self, X):
+        """
+        Apply the inverse transformation to the data.
 
-    # for feature indices
-    Bset = []
+        Parameters:
+        X: array-like, shape (n_samples, n_features)
+            The transformed data to inverse transform.
 
-    # first part of the flag
-    Bset.append(Aset[0])
-    B = D[:,Bset[0]]
-    C = B
-    U = truncate_svd(C, eps_rank, zero_tol)
-    X.append(U)
-    P = np.eye(n) - X[-1] @ X[-1].T
-    m = np.zeros((k,1))
-    # m[0] = np.linalg.matrix_rank(C)
-    m[0] = X[-1].shape[1]
+        Returns:
+        X_original: array-like, shape (n_samples, n_features)
+            Data in its original form before transformation.
+        """
+        X_original = np.zeros((self.n_, self.p_))
+        # loop through flag
+        for i in range(len(self.flag_type_)):
+            # make projection matrices
+            n_i = self.flag_type_[i]
+            if i < 1:
+                n_im1 = 0
+                Bset_i = self.Aset_[i]
+            else:
+                n_im1 = self.flag_type_[i-1]
+                Bset_i = np.setdiff1d(self.Aset_[i],self.Aset_[i-1])
 
-    # the rest of the flag
-    for i in range(1,k):
-        # print(i)
-        Bset.append(np.setdiff1d(Aset[i],Aset[i-1]))
-        B = D[:,Bset[i]]
-        C = P @ B
-        C[np.isclose(C, 0, atol=zero_tol)] = 0
-        if np.all(C == 0):
-            m[i] = 0
-        else:
-            U = truncate_svd(C, eps_rank, zero_tol)
-            X.append(U)
-            P = (np.eye(n) - X[-1] @ X[-1].T) @ P
-            # m[i] = np.linalg.matrix_rank(C)
-            m[i] = X[-1].shape[1]
+            
+            X_original[:, Bset_i] = X[:,n_im1: n_i] @ X[:,n_im1: n_i].T @ self.D_[:,Bset_i]
 
-    # translate to stiefel manifold representative n x n_k
-    X = np.hstack(X)
-    if X.shape[1] > n:
-        print(f'error {np.cumsum(m).astype(int)}')
-        X = X[:,:n]
+        return X_original
 
-    # compute the flag type (n_1,n_2,...,n_k)
-    m = m[m != 0] # remove 0s
-    flag_type = np.cumsum(m).astype(int)
+    def truncate_svd(self, C: np.array) -> np.array:
+        U,S,_ = np.linalg.svd(C, full_matrices=False)
 
-    return X, flag_type
+        nnz_ids = ~np.isclose(S, 0, atol=self.zero_tol_)
+        U = U[:,nnz_ids]
+        S = S[nnz_ids]
+
+        s_prop = np.cumsum(S**2)/np.sum(S**2)
+        good_idx = s_prop<=self.eps_rank_
+        U = U[:,good_idx]
+
+        return U
