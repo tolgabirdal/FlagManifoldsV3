@@ -134,8 +134,9 @@ class FlagRep(BaseEstimator):
             else:
                 n_im1 = self.flag_type_[i-1]
                 Bset_i = np.setdiff1d(self.Aset_[i],self.Aset_[i-1])
-                P = (np.eye(self.n_) - X[:,n_im1: n_i] @ X[:,n_im1: n_i].T) @ P
-                X_original[:, Bset_i] = (P + X[:,n_im1: n_i] @ X[:,n_im1: n_i].T) @ self.D_[:,Bset_i]
+                Pxi = X[:,n_im1: n_i] @ X[:,n_im1: n_i].T
+                P = Pxi + (np.eye(self.n_) - Pxi) @ P
+                X_original[:, Bset_i] = P @ self.D_[:,Bset_i]
 
         return X_original
 
