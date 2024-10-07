@@ -20,7 +20,8 @@ def chordal_distance(X, Y, Bs_x, Bs_y):
         elif sin_sq < 0:
             print('sine squared less than 0')
             print(sin_sq)
-        
+            sin_sq = 0
+        print(dist)
         dist = dist + np.sqrt(sin_sq)
 
     return dist

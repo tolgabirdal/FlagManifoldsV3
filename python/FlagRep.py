@@ -15,10 +15,6 @@ class FlagRep(BaseEstimator):
         self.D_ = np.array([])
         self.solver_ = solver
 
-        # Ensure the matrix is not too large to handle
-        if self.n_ > 10000 or self.p_ > 10000:
-            raise MemoryError("Input matrix is too large. Consider reducing the size.")
-
         # Check if flag_type matches the size of Aset
         if len(self.flag_type_) != len(self.Aset_) and len(self.flag_type_) > 0:
             raise ValueError('flag_type and Aset lengths are not equal')
@@ -42,9 +38,13 @@ class FlagRep(BaseEstimator):
 
         self.n_,self.p_ = self.D_.shape
 
+        # Ensure the matrix is not too large to handle
+        if self.n_ > 10000:# or self.p_ > 10000:
+            raise MemoryError("Input matrix is too large. Consider reducing the size.")
 
-        if self.n_ < self.p_:
-            raise ValueError("D must be a tall-skinny matrix (n > p). You passed n <= p.")
+
+        # if self.n_ < self.p_:
+        #     raise ValueError("D must be a tall-skinny matrix (n > p). You passed n <= p.")
 
 
         # output flag
@@ -83,13 +83,15 @@ class FlagRep(BaseEstimator):
                 m[i] = 0
             else:
                 if len(self.flag_type_) > 0:
-                    U = self.get_basis(C, n_vecs = self.flag_type_[i])
+                    U = self.get_basis(C, n_vecs = self.flag_type_[i]-self.flag_type_[i-1])
                 else:
                     U = self.get_basis(C)
 
                 X.append(U)
 
-                P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
+                if i < k-1:
+                    P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
+
                 m[i] = X[-1].shape[1]
 
         # translate to stiefel manifold representative n x n_k
@@ -116,6 +118,9 @@ class FlagRep(BaseEstimator):
         X_original: array-like, shape (n_samples, n_features)
             Data in its original form before transformation.
         """
+        if self.solver_ != 'svd':
+            raise ValueError('Inverse transform only supported for solver = svd')
+
         X_original = np.zeros((self.n_, self.p_))
 
         P = np.eye(self.n_)
@@ -146,6 +151,9 @@ class FlagRep(BaseEstimator):
         return X_original
    
     def decompose(self, D: np.array = np.empty([])):
+
+        if self.solver_ != 'svd':
+            raise ValueError('Decomposition only supported for solver = svd')
 
         X = self.fit_transform(D)
 
@@ -219,7 +227,7 @@ class FlagRep(BaseEstimator):
             S = S[nnz_ids]
 
             s_prop = np.cumsum(S**2)/np.sum(S**2)
-            good_idx = s_prop<=self.eps_rank_
+            good_idx = s_prop<=self.eps_rank_ + self.zero_tol_
             U = U[:,good_idx]
 
         return U
@@ -250,4 +258,8 @@ class FlagRep(BaseEstimator):
             else:
                 U = self.truncate_qr(C)
         
+        else:
+            raise ValueError('Solver must be either qr or svd')
+        
         return U
+
