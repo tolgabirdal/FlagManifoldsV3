@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator
 class FlagRep(BaseEstimator):
     def __init__(self, Aset: list = [], flag_type: list = [], 
                  eps_rank: float = 1, zero_tol: float = 1e-10,
-                 solver = 'svd'):
+                 solver = 'svd', plot_eigs = False):
 
         self.Aset_ = Aset
         self.eps_rank_ = eps_rank
@@ -14,6 +14,7 @@ class FlagRep(BaseEstimator):
         self.flag_type_ = flag_type
         self.D_ = np.array([])
         self.solver_ = solver
+        self.plot_eigs_ = plot_eigs
 
         # Check if flag_type matches the size of Aset
         if len(self.flag_type_) != len(self.Aset_) and len(self.flag_type_) > 0:
@@ -41,11 +42,6 @@ class FlagRep(BaseEstimator):
         # Ensure the matrix is not too large to handle
         if self.n_ > 10000:# or self.p_ > 10000:
             raise MemoryError("Input matrix is too large. Consider reducing the size.")
-
-
-        # if self.n_ < self.p_:
-        #     raise ValueError("D must be a tall-skinny matrix (n > p). You passed n <= p.")
-
 
         # output flag
         X = []
@@ -119,7 +115,7 @@ class FlagRep(BaseEstimator):
             Data in its original form before transformation.
         """
         if self.solver_ != 'svd':
-            raise ValueError('Inverse transform only supported for solver = svd')
+            print('solver != svd is unstable')
 
         X_original = np.zeros((self.n_, self.p_))
 
@@ -153,7 +149,7 @@ class FlagRep(BaseEstimator):
     def decompose(self, D: np.array = np.empty([])):
 
         if self.solver_ != 'svd':
-            raise ValueError('Decomposition only supported for solver = svd')
+            print('solver != svd is unstable')
 
         X = self.fit_transform(D)
 
@@ -219,16 +215,37 @@ class FlagRep(BaseEstimator):
     def truncate_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
         
         U,S,_ = np.linalg.svd(C, full_matrices=False)
+
         if n_vecs > 0:
             U = U[:,:n_vecs]
         else:
+            S = S/S.max()
+
+            # idea from here: https://inria.hal.science/hal-02326070/file/demo.pdf
+            # n_vecs = np.sum(np.array([np.linalg.norm(S[-k:]) for k in range(len(S))]) >= 1e-1)
+            # U = U[:,:n_vecs]
+
+
+            # eigengap thresholding
+            # S_gaps = -np.diff(S)
+            # for s_gap in S_gaps:
+            #     if s_gap >= 1e-3:
+            #         n_vecs +=1
+            # U = U[:,:n_vecs]
+
+            # pca-inspired
             nnz_ids = ~np.isclose(S, 0, atol=self.zero_tol_)
             U = U[:,nnz_ids]
             S = S[nnz_ids]
-
             s_prop = np.cumsum(S**2)/np.sum(S**2)
-            good_idx = s_prop<=self.eps_rank_ + self.zero_tol_
-            U = U[:,good_idx]
+            n_vecs = np.sum(s_prop<=(self.eps_rank_+ self.zero_tol_))
+            U = U[:,:n_vecs]
+
+        if self.plot_eigs_:
+            plt.figure()
+            plt.plot(S)
+            if n_vecs > 0:
+                plt.vlines(x = n_vecs, ymin =0, ymax = S.max(), colors = 'tab:red', ls = 'dashed')
 
         return U
 

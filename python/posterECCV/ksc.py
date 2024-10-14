@@ -2,8 +2,7 @@ import numpy as np
 import scipy
 import scipy.io as sio
 
-from FlagRep0 import chordal_distance, truncate_svd
-from FlagRep import FlagRep
+from FlagRep0 import FlagRep, chordal_distance, truncate_svd
 
 from matplotlib import pyplot as plt
 
@@ -170,6 +169,7 @@ if __name__ == '__main__':
 
     patch_size = 3
     k_values = np.arange(1,25)
+    cutoff = 1
 
     n_trials = 100
 
@@ -210,13 +210,11 @@ if __name__ == '__main__':
         flag_types[method_name] = []
         for pt in tqdm.tqdm(mod_data):
             if method_name == 'FlagRep':
-                my_flag_rep = FlagRep(Aset=Aset, zero_tol = 1e-8, eps_rank=1-1e-8)
-                flag_pt = my_flag_rep.fit_transform(pt)
-                f_type = my_flag_rep.flag_type()
+                flag_pt, f_type = FlagRep(pt, Aset, eps_rank = cutoff, zero_tol=1e-8)
                 flag_types[method_name].append(f_type)
             elif method_name == 'SVD':
                 pt = pt[:,Aset[-1]]
-                flag_pt = truncate_svd(pt, zero_tol=1e-8, eps_rank=1-1e-8)
+                flag_pt = truncate_svd(pt, eps_rank = cutoff, zero_tol=1e-8)
                 flag_types[method_name].append([1,flag_pt.shape[1]])
             elif method_name == 'QR':
                 pt = pt[:,Aset[-1]]
@@ -285,7 +283,6 @@ if __name__ == '__main__':
     plt.figure(figsize = (9,3))
     sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
     plt.tight_layout()
-    plt.show()
-    # plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
+    plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
 
 

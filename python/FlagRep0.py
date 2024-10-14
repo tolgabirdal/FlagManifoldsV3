@@ -21,13 +21,12 @@ def chordal_distance(X, Y, Bs_x, Bs_y):
             print('sine squared less than 0')
             print(sin_sq)
             sin_sq = 0
-        print(dist)
         dist = dist + np.sqrt(sin_sq)
 
     return dist
 
 
-def truncate_svd(C: np.array, eps_rank: float = 1e-8, zero_tol: float = 1e-8) -> np.array:
+def truncate_svd(C: np.array, eps_rank: float = 1, zero_tol: float = 1e-8) -> np.array:
     U,S,_ = np.linalg.svd(C, full_matrices=False)
 
 
