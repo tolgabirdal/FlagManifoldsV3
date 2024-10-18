@@ -2,6 +2,7 @@ import numpy as np
 import scipy
 from matplotlib import pyplot as plt
 from sklearn.base import BaseEstimator
+from GGD import ggd
 
 class FlagRep(BaseEstimator):
     def __init__(self, Aset: list = [], flag_type: list = [], 
@@ -148,15 +149,16 @@ class FlagRep(BaseEstimator):
    
     def decompose(self, D: np.array = np.empty([])):
 
-        if self.solver_ != 'svd':
+        if self.solver_ not in ['svd', 'irls svd', 'ggd']:
             print('solver != svd is unstable')
 
         X = self.fit_transform(D)
 
-        n_k = X.shape[1]
+        n,n_k = X.shape
 
         R = np.zeros((n_k,self.p_))
 
+        P = np.eye(n)
         for i in range(len(self.flag_type_)):
 
             if i == 0:
@@ -164,6 +166,8 @@ class FlagRep(BaseEstimator):
             else:
                 n_im1 = self.flag_type_[i-1]
             n_i = self.flag_type_[i]
+
+            Xi = X[:,n_im1:n_i]
 
             for j in range(i,len(self.Aset_)):
 
@@ -175,8 +179,10 @@ class FlagRep(BaseEstimator):
                     p_jm1 = len(self.Aset_[j-1])
                 p_j = len(self.Aset_[j])
 
-                Bij = X[:,n_im1:n_i].T @ D[:, Bset_j]
+                Bij = Xi.T @ P @ D[:, Bset_j]
                 R[n_im1:n_i,p_jm1:p_j] = Bij
+            
+            P = (np.eye(n) - Xi @ Xi.T) @ P
         
         return X, R
 
@@ -186,6 +192,8 @@ class FlagRep(BaseEstimator):
         
         if len(D) == 0:
             D = self.D_
+        else:
+            self.n_ = D.shape[0]
 
         obj_val = 0
         # loop through flag
@@ -248,6 +256,29 @@ class FlagRep(BaseEstimator):
                 plt.vlines(x = n_vecs, ymin =0, ymax = S.max(), colors = 'tab:red', ls = 'dashed')
 
         return U
+    
+    def irls_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
+        
+        U0 = self.truncate_svd(C, n_vecs)
+        ii=0
+        err = 1
+        while ii < 50 and err > 1e-10:
+            C_weighted = []
+            for i in range(C.shape[1]):
+                c = C[:,[i]]
+                sin_sq = c.T @ c - c.T @ U0 @ U0.T @ c
+                sin_sq = np.max(np.array([sin_sq[0,0], 1e-8]))
+                C_weighted.append(((sin_sq)**(-1/4))*c)
+
+            C_weighted = np.hstack(C_weighted)
+
+            U1 = self.truncate_svd(C_weighted, n_vecs)
+            err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
+            U0 = U1.copy()
+            ii+=1
+
+
+        return U0
 
     def truncate_qr(self, C, n_vecs: int = 0) -> np.array:
         Q,R,_ = scipy.linalg.qr(C, pivoting = True)
@@ -268,6 +299,18 @@ class FlagRep(BaseEstimator):
                 U = self.truncate_svd(C, n_vecs = n_vecs)
             else:
                 U = self.truncate_svd(C)
+
+        elif self.solver_ == 'irls svd':
+            if len(self.flag_type_) > 0:
+                U = self.irls_svd(C, n_vecs = n_vecs)
+            else:
+                U = self.irls_svd(C)  
+
+        elif self.solver_ == 'ggd':
+            if len(self.flag_type_) > 0:
+                U = ggd(C.T, s=1e-1, maxiter=100, d=n_vecs, opt=0)
+            else:
+                ValueError('must provide flag type for solver = ggd')     
 
         elif self.solver_ == 'qr':
             if len(self.flag_type_) > 0:

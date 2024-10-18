@@ -88,6 +88,7 @@ def get_latent_space_train(train_dataset, n_shots, model, seed0):
         hidden_rep0s = []
         hidden_rep1s = []
         euc_shot_dict[i] = np.zeros((128,1))
+        # euc_shot_dict[i] = np.zeros((256,1))
         for img in [train_dta[si] for si in s]:
             sample_image = img.view(-1, 28*28)
             with torch.no_grad():
@@ -105,6 +106,7 @@ def get_latent_space_train(train_dataset, n_shots, model, seed0):
                 hidden_rep0s.append(hidden_rep0)
                 hidden_rep1s.append(hidden_rep1)
                 euc_shot_dict[i] += h31.cpu().detach().numpy().T
+                # euc_shot_dict[i] += np.vstack([h31.cpu().detach().numpy().T,h21.cpu().detach().numpy().T])
 
         shot_dict[i] = np.hstack([np.hstack(hidden_rep0s),np.hstack(hidden_rep1s)])
         euc_shot_dict[i] = euc_shot_dict[i]/n_shots
@@ -153,6 +155,7 @@ def get_latent_space_test(test_dataset):
             hidden_rep = [h.cpu().detach().numpy().T for h in [h31,h21]]
         test_mats.append(np.hstack(hidden_rep))
         euc_test.append(h31.cpu().detach().numpy().T)
+        # euc_test.append(np.vstack(hidden_rep))
     return test_mats, euc_test
         
 def get_test_flags(test_mats, fl_type = [1,2]):
