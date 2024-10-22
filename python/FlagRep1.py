@@ -47,53 +47,49 @@ class FlagRep(BaseEstimator):
         # output flag
         X = []
 
-        # output R
-        Rs = {}
-
         # get the number of As
         k = len(self.Aset_)
 
         # for feature indices
         Bset = []
-        B = []
-        for i in range(k):
-            if i == 0:
-                Bset.append(self.Aset_[0])
-            else:
-                Bset.append(np.setdiff1d(self.Aset_[i],self.Aset_[i-1]))
-            B.append(self.D_[:,Bset[i]])
 
-        #weights
-        m = np.zeros(len(self.Aset_))
-        P = np.eye(self.n_)
+        
+        # first part of the flag
+        Bset.append(self.Aset_[0])
+        B = self.D_[:,Bset[0]]
+        C = B
 
-        for i in range(k):
-            C = P @ B[i]
+        if len(self.flag_type_) > 0:
+            U = self.get_basis(C, n_vecs = self.flag_type_[0])
+        else:
+            U = self.get_basis(C)
+
+        X.append(U)
+
+        P = np.eye(self.n_) - X[-1] @ X[-1].T
+        m = np.zeros((k,1))
+        m[0] = X[-1].shape[1]
+
+        # the rest of the flag
+        for i in range(1,k):
+            Bset.append(np.setdiff1d(self.Aset_[i],self.Aset_[i-1]))
+            B = self.D_[:,Bset[i]]
+            C = P @ B
             C[np.isclose(C, 0, atol=self.zero_tol_)] = 0
-            if np.all(C == 0) and len(self.flag_type_) == 0:
-                m[j] = 0
+            if np.all(C == 0):
+                m[i] = 0
             else:
                 if len(self.flag_type_) > 0:
-                    if i == 0:
-                        i0 = 0
-                    else:
-                        i0 = self.flag_type_[i-1]
-                    i1 = self.flag_type_[i]
-                    U = self.get_basis(C, n_vecs = i1-i0)
+                    U = self.get_basis(C, n_vecs = self.flag_type_[i]-self.flag_type_[i-1])
                 else:
                     U = self.get_basis(C)
 
-
                 X.append(U)
-
-                for j in range(i,len(self.Aset_)):
-                    Rs[(i,j)] = X[i].T @ P @ B[j] 
 
                 if i < k-1:
                     P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
 
-                if len(self.flag_type_) == 0:
-                    m[j] = X[-1].shape[1]
+                m[i] = X[-1].shape[1]
 
         # translate to stiefel manifold representative n x n_k
         X = np.hstack(X)
@@ -102,32 +98,12 @@ class FlagRep(BaseEstimator):
             X = X[:,:self.n_]
 
         # compute the flag type (n_1,n_2,...,n_k)
-        if len(self.flag_type_) == 0:
-            m = m[m != 0] # remove 0s
-            self.flag_type_ = np.cumsum(m).astype(int)
-        
+        m = m[m != 0] # remove 0s
+        self.flag_type_ = np.cumsum(m).astype(int)
 
-        n_k = X.shape[1]
-        R = np.zeros((n_k,self.p_))
-        for i in range(k):
-            if i == 0:
-                i0 = 0
-            else:
-                i0 = self.flag_type_[i-1]
-            i1 = self.flag_type_[i]
+        return X
 
-
-            for j in range(i,len(self.Aset_)):
-                if j == 0:
-                    j0 = 0
-                else:
-                    j0 = len(self.Aset_[j-1])
-                j1 = len(self.Aset_[j])
-                R[i0:i1,j0:j1] = Rs[(i,j)] #@ np.diag(w[j])
-
-        return X, R
-
-    def inverse_transform(self, X, R):
+    def inverse_transform(self, X):
         """
         Apply the inverse transformation to the data.
 
@@ -139,10 +115,76 @@ class FlagRep(BaseEstimator):
         X_original: array-like, shape (n_samples, n_features)
             Data in its original form before transformation.
         """
+        if self.solver_ != 'svd':
+            print('solver != svd is unstable')
 
-        X_original = X @ R
+        X_original = np.zeros((self.n_, self.p_))
+
+        P = np.eye(self.n_)
+
+        # loop through flag
+        for i in range(len(self.Aset_)):
+            
+            if i < len(self.flag_type_):
+                n_i = self.flag_type_[i]
+                flag_i = i
+            else:
+                print('number of subspaces in flag shorter than number feature sets')
+                print('... estimating reconstruction using final part of flag')
+
+            if flag_i == 0:
+                n_im1 = 0
+                Bset_i = self.Aset_[i]
+                P = X[:,n_im1: n_i] @ X[:,n_im1: n_i].T
+                X_original[:, Bset_i] = P @ self.D_[:,Bset_i]
+
+            else:
+                n_im1 = self.flag_type_[i-1]
+                Bset_i = np.setdiff1d(self.Aset_[i],self.Aset_[i-1])
+                Pxi = X[:,n_im1: n_i] @ X[:,n_im1: n_i].T
+                P = Pxi + (np.eye(self.n_) - Pxi) @ P
+                X_original[:, Bset_i] = P @ self.D_[:,Bset_i]
 
         return X_original
+   
+    def decompose(self, D: np.array = np.empty([])):
+
+        if self.solver_ not in ['svd', 'irls svd', 'ggd']:
+            print('solver != svd is unstable')
+
+        X = self.fit_transform(D)
+
+        n,n_k = X.shape
+
+        R = np.zeros((n_k,self.p_))
+
+        P = np.eye(n)
+        for i in range(len(self.flag_type_)):
+
+            if i == 0:
+                n_im1 = 0
+            else:
+                n_im1 = self.flag_type_[i-1]
+            n_i = self.flag_type_[i]
+
+            Xi = X[:,n_im1:n_i]
+
+            for j in range(i,len(self.Aset_)):
+
+                if j == 0:
+                    Bset_j = self.Aset_[j]
+                    p_jm1 = 0
+                else:
+                    Bset_j = np.setdiff1d(self.Aset_[j],self.Aset_[j-1])
+                    p_jm1 = len(self.Aset_[j-1])
+                p_j = len(self.Aset_[j])
+
+                Bij = Xi.T @ P @ D[:, Bset_j]
+                R[n_im1:n_i,p_jm1:p_j] = Bij
+            
+            P = (np.eye(n) - Xi @ Xi.T) @ P
+        
+        return X, R
 
     def objective_value(self, X: np.array, D: np.array = np.empty([]), fl_type: list = []) -> float:
         if len(fl_type) == 0:
@@ -215,6 +257,29 @@ class FlagRep(BaseEstimator):
 
         return U
     
+    def irls_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
+        
+        U0 = self.truncate_svd(C, n_vecs)
+        ii=0
+        err = 1
+        while ii < 50 and err > 1e-10:
+            C_weighted = []
+            for i in range(C.shape[1]):
+                c = C[:,[i]]
+                sin_sq = c.T @ c - c.T @ U0 @ U0.T @ c
+                sin_sq = np.max(np.array([sin_sq[0,0], 1e-8]))
+                C_weighted.append(((sin_sq)**(-1/4))*c)
+
+            C_weighted = np.hstack(C_weighted)
+
+            U1 = self.truncate_svd(C_weighted, n_vecs)
+            err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
+            U0 = U1.copy()
+            ii+=1
+
+
+        return U0
+
     def truncate_qr(self, C, n_vecs: int = 0) -> np.array:
         Q,R,_ = scipy.linalg.qr(C, pivoting = True)
 
@@ -227,48 +292,25 @@ class FlagRep(BaseEstimator):
             Q = Q[:,nonzero_row_indices]
 
         return Q
-    
-    def irls_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
-        
-        U0 = self.truncate_svd(C, n_vecs)
-        ii=0
-        err = 1
-
-        pi = C.shape[1]
-       
-        while ii < 50 and err > 1e-10:
-            C_weighted = []
-            weights = np.zeros(pi)
-            for i in range(pi):
-                c = C[:,[i]]
-                sin_sq = c.T @ c - c.T @ U0 @ U0.T @ c
-                sin_sq = np.max(np.array([sin_sq[0,0], 1e-8]))
-                weights[i] = sin_sq**(-1/4)
-            
-            C_weighted =  C @ np.diag(weights)
-
-
-
-            U1 = self.truncate_svd(C_weighted, n_vecs)
-            err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
-            U0 = U1.copy()
-            ii+=1
-
-
-        return U0
 
     def get_basis(self, C, n_vecs: int = 0):
         if self.solver_ == 'svd':
             if len(self.flag_type_) > 0:
                 U = self.truncate_svd(C, n_vecs = n_vecs)
             else:
-                U = self.truncate_svd(C)   
+                U = self.truncate_svd(C)
 
         elif self.solver_ == 'irls svd':
             if len(self.flag_type_) > 0:
                 U = self.irls_svd(C, n_vecs = n_vecs)
             else:
-                U = self.irls_svd(C)   
+                U = self.irls_svd(C)  
+
+        elif self.solver_ == 'ggd':
+            if len(self.flag_type_) > 0:
+                U = ggd(C.T, s=1e-1, maxiter=100, d=n_vecs, opt=0)
+            else:
+                ValueError('must provide flag type for solver = ggd')     
 
         elif self.solver_ == 'qr':
             if len(self.flag_type_) > 0:
@@ -277,7 +319,7 @@ class FlagRep(BaseEstimator):
                 U = self.truncate_qr(C)
         
         else:
-            raise ValueError('Solver must be either qr or svd or irls svd')
+            raise ValueError('Solver must be either qr or svd')
         
         return U
 
