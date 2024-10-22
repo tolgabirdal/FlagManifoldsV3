@@ -40,7 +40,6 @@ class RobustFlagRep(FlagRep):
         # get the number of As
         k = len(self.Aset_)
 
-        Rs = {}
 
         # for feature indices
         Bset = []
@@ -84,15 +83,10 @@ class RobustFlagRep(FlagRep):
                 w.append(wi)
 
                 X.append(U)
-                
-                for j in range(i,len(self.Aset_)):
-                    if i == j:
-                        Rs[(i,j)] = X[i].T @ P @ B[j] @ np.diag(w[j])
-                    else:
-                        Rs[(i,j)] = X[i].T @ P @ B[j]
             
                 if i < k-1:
                     P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
+                    Ps.append(P)
 
                 if len(self.flag_type_) == 0:
                     m[j] = X[-1].shape[1]
@@ -143,7 +137,7 @@ class RobustFlagRep(FlagRep):
                 #     else:
                 #         Rs.append(Xi.T @ Ps[i] @ B[j][:,[l]])
 
-                R[i0:i1,j0:j1] = Rs[(i,j)] #@ np.diag(w[j])
+                R[i0:i1,j0:j1] =  Xi.T @ Ps[i] @ B[j] @ np.diag(w[j]) #@ np.diag(w[j])
 
         return X, R
 
