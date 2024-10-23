@@ -9,7 +9,7 @@ class FlagRep(BaseEstimator):
                  eps_rank: float = 1, zero_tol: float = 1e-10,
                  solver = 'svd', plot_eigs = False):
 
-        self.Aset_ = Aset
+        self.Bset_ = [Aset[0]]+[np.setdiff1d(Aset[i],Aset[i-1])for i in range(1,len(Aset))]
         self.eps_rank_ = eps_rank
         self.zero_tol_ = zero_tol
         self.flag_type_ = flag_type
@@ -18,7 +18,7 @@ class FlagRep(BaseEstimator):
         self.plot_eigs_ = plot_eigs
 
         # Check if flag_type matches the size of Aset
-        if len(self.flag_type_) != len(self.Aset_) and len(self.flag_type_) > 0:
+        if len(self.flag_type_) != len(self.Bset_) and len(self.flag_type_) > 0:
             raise ValueError('flag_type and Aset lengths are not equal')
 
     def flag_type(self):
@@ -44,56 +44,58 @@ class FlagRep(BaseEstimator):
         if self.n_ > 10000:# or self.p_ > 10000:
             raise MemoryError("Input matrix is too large. Consider reducing the size.")
 
-        # output flag
-        X = []
-
-        # output R
-        Rs = {}
-
         # get the number of As
-        k = len(self.Aset_)
+        k = len(self.Bset_)
 
-        # for feature indices
-        Bset = []
-        B = []
-        for i in range(k):
-            if i == 0:
-                Bset.append(self.Aset_[0])
-            else:
-                Bset.append(np.setdiff1d(self.Aset_[i],self.Aset_[i-1]))
-            B.append(self.D_[:,Bset[i]])
+        # get hierarchy sizes
+        b = [len(Bset_i) for Bset_i in self.Bset_]
 
-        #weights
-        m = np.zeros(len(self.Aset_))
+        # get Bs
+        B = [D[:,Bset_i] for Bset_i in self.Bset_]
+
+        #flag type
+        m = np.zeros(len(self.Bset_), dtype=int)
+
+        #define P_0
         P = np.eye(self.n_)
 
+        # output flag
+        X = []
+        R = []
         for i in range(k):
+
+            #compute C
             C = P @ B[i]
+
+            # if all of Bi is in the nullspace of Ci then set it to 0
             C[np.isclose(C, 0, atol=self.zero_tol_)] = 0
             if np.all(C == 0) and len(self.flag_type_) == 0:
-                m[j] = 0
+                m[i] = 0
+
+            #otherwise continue with flagrep
             else:
-                if len(self.flag_type_) > 0:
-                    if i == 0:
-                        i0 = 0
-                    else:
-                        i0 = self.flag_type_[i-1]
-                    i1 = self.flag_type_[i]
-                    U = self.get_basis(C, n_vecs = i1-i0)
+
+                # get basis
+                if len(self.flag_type_) == 0:
+                    # unknown flag type
+                    X.append(self.get_basis(C))
+                    m[i] = X[-1].shape[1]
                 else:
-                    U = self.get_basis(C)
+                    # known flag type
+                    if i == 0:
+                        m[i] = self.flag_type_[i]
+                    else:
+                        m[i] = self.flag_type_[i]-self.flag_type_[i-1]
+                    X.append(self.get_basis(C, n_vecs = m[i]))
 
+                # get Ri
+                Bs = np.hstack([np.zeros((self.n_, b[j])) for j in range(i)]+[B[j] for j in range(i,k)])
+                R.append(Bs.T @ P.T @ X[-1])
 
-                X.append(U)
-
-                for j in range(i,len(self.Aset_)):
-                    Rs[(i,j)] = X[i].T @ P @ B[j] 
-
+                # compute projection
                 if i < k-1:
                     P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
 
-                if len(self.flag_type_) == 0:
-                    m[j] = X[-1].shape[1]
 
         # translate to stiefel manifold representative n x n_k
         X = np.hstack(X)
@@ -105,25 +107,9 @@ class FlagRep(BaseEstimator):
         if len(self.flag_type_) == 0:
             m = m[m != 0] # remove 0s
             self.flag_type_ = np.cumsum(m).astype(int)
-        
 
-        n_k = X.shape[1]
-        R = np.zeros((n_k,self.p_))
-        for i in range(k):
-            if i == 0:
-                i0 = 0
-            else:
-                i0 = self.flag_type_[i-1]
-            i1 = self.flag_type_[i]
-
-
-            for j in range(i,len(self.Aset_)):
-                if j == 0:
-                    j0 = 0
-                else:
-                    j0 = len(self.Aset_[j-1])
-                j1 = len(self.Aset_[j])
-                R[i0:i1,j0:j1] = Rs[(i,j)] #@ np.diag(w[j])
+        # stack R
+        R = np.hstack(R).T
 
         return X, R
 
@@ -140,9 +126,9 @@ class FlagRep(BaseEstimator):
             Data in its original form before transformation.
         """
 
-        X_original = X @ R
+        Dhat = X @ R
 
-        return X_original
+        return Dhat
 
     def objective_value(self, X: np.array, D: np.array = np.empty([]), fl_type: list = []) -> float:
         if len(fl_type) == 0:
@@ -154,27 +140,31 @@ class FlagRep(BaseEstimator):
             self.n_ = D.shape[0]
 
         obj_val = 0
+        P = np.eye(self.n_)
         # loop through flag
-        for i in range(len(self.Aset_)):
+        for i in range(len(self.Bset_)):
             
             if i < len(self.flag_type_):
                 n_i = self.flag_type_[i]
-                flag_i = i
             else:
                 print('number of subspaces in flag shorter than number feature sets')
                 print('... estimating reconstruction using final part of flag')
 
-            if flag_i == 0:
+            if i == 0:
                 n_im1 = 0
-                Bset_i = self.Aset_[i]
-                P = np.eye(self.n_) - X[:,n_im1: n_i] @ X[:,n_im1: n_i].T
-
             else:
                 n_im1 = self.flag_type_[i-1]
-                Bset_i = np.setdiff1d(self.Aset_[i],self.Aset_[i-1])
-                P = (np.eye(self.n_) - X[:,n_im1: n_i] @ X[:,n_im1: n_i].T) @ P
+
+            Xi = X[:,n_im1: n_i]
+
+
+            Bset_i = self.Bset_[i]
+            obj_val += np.linalg.norm(P @ D[:,Bset_i] - Xi @ Xi.T @ P @ D[:,Bset_i])**2
+
             
-            obj_val += np.linalg.norm(P @ D[:,Bset_i])**2
+            P = (np.eye(self.n_) - Xi @ Xi.T) @ P
+            
+            
         
         return obj_val
 
