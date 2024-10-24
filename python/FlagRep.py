@@ -10,6 +10,7 @@ class FlagRep(BaseEstimator):
                  solver = 'svd', plot_eigs = False):
 
         self.Bset_ = [Aset[0]]+[np.setdiff1d(Aset[i],Aset[i-1])for i in range(1,len(Aset))]
+        # self.Bset_ = [Aset[-1]]+[np.setdiff1d(Aset[-1],Aset[i])for i in range(len(Aset)-1)]
         self.eps_rank_ = eps_rank
         self.zero_tol_ = zero_tol
         self.flag_type_ = flag_type
@@ -23,6 +24,8 @@ class FlagRep(BaseEstimator):
 
     def flag_type(self):
         return self.flag_type_
+    
+    
 
     def fit_transform(self, D):
         """
@@ -49,7 +52,6 @@ class FlagRep(BaseEstimator):
 
         # get hierarchy sizes
         b = [len(Bset_i) for Bset_i in self.Bset_]
-
         # get Bs
         B = [D[:,Bset_i] for Bset_i in self.Bset_]
 
@@ -74,7 +76,6 @@ class FlagRep(BaseEstimator):
 
             #otherwise continue with flagrep
             else:
-
                 # get basis
                 if len(self.flag_type_) == 0:
                     # unknown flag type
@@ -90,12 +91,13 @@ class FlagRep(BaseEstimator):
 
                 # get Ri
                 Bs = np.hstack([np.zeros((self.n_, b[j])) for j in range(i)]+[B[j] for j in range(i,k)])
-                R.append(Bs.T @ P.T @ X[-1])
+                R.append(Bs.conj().T @ P.conj().T @ X[-1])
 
                 # compute projection
                 if i < k-1:
-                    P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
-
+                    P = (np.eye(self.n_) - X[-1] @ X[-1].conj().T) @ P
+                
+                
 
         # translate to stiefel manifold representative n x n_k
         X = np.hstack(X)
@@ -109,7 +111,7 @@ class FlagRep(BaseEstimator):
             self.flag_type_ = np.cumsum(m).astype(int)
 
         # stack R
-        R = np.hstack(R).T
+        R = np.hstack(R).conj().T
 
         return X, R
 
@@ -168,9 +170,10 @@ class FlagRep(BaseEstimator):
         
         return obj_val
 
+
     def truncate_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
-        
         U,S,_ = np.linalg.svd(C, full_matrices=False)
+        
 
         if n_vecs > 0:
             U = U[:,:n_vecs]
@@ -226,12 +229,12 @@ class FlagRep(BaseEstimator):
 
         pi = C.shape[1]
        
-        while ii < 50 and err > 1e-10:
+        while ii < 100 and err > 1e-10:
             C_weighted = []
             weights = np.zeros(pi)
             for i in range(pi):
                 c = C[:,[i]]
-                sin_sq = c.T @ c - c.T @ U0 @ U0.T @ c
+                sin_sq = c.conj().T @ c - c.conj().T @ U0 @ U0.conj().T @ c
                 sin_sq = np.max(np.array([sin_sq[0,0], 1e-8]))
                 weights[i] = sin_sq**(-1/4)
             
@@ -240,7 +243,7 @@ class FlagRep(BaseEstimator):
 
 
             U1 = self.truncate_svd(C_weighted, n_vecs)
-            err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
+            err = np.abs(np.linalg.norm(U1 @ U1.conj().T - U0 @ U0.conj().T))
             U0 = U1.copy()
             ii+=1
 
