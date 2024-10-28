@@ -1,3 +1,7 @@
+# only works with sum of grassmannian chordal distances rather than chordal distance between flags.
+# and SVD outpreforms other methods
+
+
 import numpy as np
 import scipy
 import scipy.io as sio
@@ -28,7 +32,6 @@ def make_Bs(fl_type):
         Bs.append(np.arange(fl_type[i-1],fl_type[i]))
     return Bs
 
-
 def evaluate_knn_with_distances(distance_matrix_train, distance_matrix_test, y_train, y_test, k_values):
     accuracies = []
     for k in k_values:
@@ -46,25 +49,6 @@ def evaluate_knn_with_distances(distance_matrix_train, distance_matrix_test, y_t
         accuracies.append(accuracy)
     
     return accuracies
-
-
-def evaluate_knn(data_train, data_test, y_train, y_test, k_values):
-    accuracies = []
-    for k in k_values:
-        knn = KNeighborsClassifier(n_neighbors=k)
-        
-        # Fit the model using the training distance matrix and labels
-        knn.fit(data_train, y_train)
-        
-        # Predict using the test distance matrix
-        y_pred = knn.predict(data_test)
-        
-        # Calculate accuracy
-        accuracy = accuracy_score(y_test, y_pred)
-        # print(f"k={k}, Accuracy: {accuracy:.4f}")
-        accuracies.append(accuracy)
-    return accuracies
-
 
 def extract_patches_of_class(data, labels, patch_size, target_class):
     """
@@ -94,7 +78,6 @@ def extract_patches_of_class(data, labels, patch_size, target_class):
                 patch_labels.append(target_class)
 
     return np.array(patches), np.array(patch_labels)
-
 
 def extract_patches(data, labels, patch_size, class_ids):
     # extract patches
@@ -145,8 +128,9 @@ def extract_patches(data, labels, patch_size, class_ids):
 
 if __name__ == '__main__':
 
-    data = scipy.io.loadmat('../data/KSC/KSC.mat')['KSC']
+    data = scipy.io.loadmat('../data/KSC/KSC_corrected.mat')['KSC']
     labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
+
 
     plt.figure()
     plt.imshow(data[:,:,40], cmap = 'grey')
@@ -171,7 +155,9 @@ if __name__ == '__main__':
     patch_size = 3
     k_values = np.arange(1,25)
 
-    n_trials = 100
+    fl_type = [1,7]
+
+    n_trials = 20
 
     colors = [
         "#1f77b4",  # Blue
@@ -210,35 +196,24 @@ if __name__ == '__main__':
         flag_types[method_name] = []
         for pt in tqdm.tqdm(mod_data):
             if method_name == 'FlagRep':
-                my_flag_rep = FlagRep(Aset=Aset, zero_tol = 1e-8, eps_rank=1-1e-8)
-                flag_pt = my_flag_rep.fit_transform(pt)
-                f_type = my_flag_rep.flag_type()
-                flag_types[method_name].append(f_type)
+                my_flag_rep = FlagRep(Aset=Aset, solver='svd', flag_type = fl_type)
+                flag_pt, _ = my_flag_rep.fit_transform(pt)
+                flag_types[method_name].append(fl_type)
             elif method_name == 'SVD':
-                pt = pt[:,Aset[-1]]
-                flag_pt = truncate_svd(pt, zero_tol=1e-8, eps_rank=1-1e-8)
-                flag_types[method_name].append([1,flag_pt.shape[1]])
+                flag_pt = truncate_svd(pt)[:,:fl_type[-1]]
+                flag_types[method_name].append(fl_type)
             elif method_name == 'QR':
-                pt = pt[:,Aset[-1]]
                 Q,_ = np.linalg.qr(pt)
-                rank_pt = np.linalg.matrix_rank(pt)
-                flag_pt = Q[:,:rank_pt]
-                flag_types[method_name].append([1,flag_pt.shape[1]])
+                flag_pt = Q[:,:fl_type[-1]]
+                flag_types[method_name].append(fl_type)
             elif method_name == 'Euclidean':
-                pt = pt[:,Aset[-1]]
                 flag_pt = flag_pt.flatten()
             flag_data[method_name].append(flag_pt)
 
-        if method_name == 'FlagRep':
-            smallest_dim = np.min([t[-1] for t in flag_types['FlagRep']])
-            flag_types['FlagRep'] = [np.array([t[0],smallest_dim]) for t in flag_types['FlagRep']]        
-        elif method_name == 'SVD':
-            smallest_dim = np.min([t[-1] for t in flag_types['SVD']])
-            flag_types['SVD'] = [np.array([t[0],smallest_dim]) for t in flag_types['SVD']]
-        
-            
+
         #make distance matrices
         dist_mats[method_name] = np.zeros((n_pts,n_pts))
+        Bs = make_Bs(fl_type)
         for i in tqdm.tqdm(range(n_pts)):
             for j in range(i+1,n_pts):
                 x = flag_data[method_name][i]
@@ -246,11 +221,7 @@ if __name__ == '__main__':
                 if method_name == 'Euclidean':
                     dist = np.linalg.norm(x-y)
                 else:
-                    fl_type_x = flag_types[method_name][i]
-                    fl_type_y = flag_types[method_name][j]
-                    Bs_x = make_Bs(fl_type_x)
-                    Bs_y = make_Bs(fl_type_y)
-                    dist = chordal_distance(x, y, Bs_x, Bs_y)
+                    dist = chordal_distance(x, y, Bs, Bs)
                 dist_mats[method_name][i,j] = dist
                 dist_mats[method_name][j,i] = dist
             
@@ -281,6 +252,8 @@ if __name__ == '__main__':
                 res = pd.DataFrame(columns = results.columns,
                                 data = [[k, method_name, acc, s]])
                 results = pd.concat([results,res])
+    
+    # results.to_csv('../results/ksc_robust_res.csv')
 
     plt.figure(figsize = (9,3))
     sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')

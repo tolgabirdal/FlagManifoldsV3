@@ -124,7 +124,7 @@ def get_train_flags(shot_dict, fl_type = [1,2]):
                             # flag_type=[1,2])
         my_flag_rep = FlagRep( [np.arange(n_shots), np.arange(2*n_shots)],
                             flag_type=fl_type)
-        frep = my_flag_rep.fit_transform(m)
+        frep, _ = my_flag_rep.fit_transform(m)
         shot_flags['FlagRep'].append(frep)
 
         q, _ = np.linalg.qr(m)
@@ -166,7 +166,7 @@ def get_test_flags(test_mats, fl_type = [1,2]):
     for m in test_mats:
         my_flag_rep = FlagRep( [np.arange(i) for i in fl_type], 
                             flag_type=fl_type)
-        frep = my_flag_rep.fit_transform(m)
+        frep, _ = my_flag_rep.fit_transform(m)
         flags['FlagRep'].append(frep)
 
         q, _ = np.linalg.qr(m)
@@ -283,7 +283,7 @@ if __name__ == '__main__':
             
             print()
 
-    results.to_csv('../results/mnist_fewshot_idea.csv')
+    results.to_csv('../results/mnist_fewshot_idea1.csv')
 
     
 

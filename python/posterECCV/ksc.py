@@ -2,6 +2,9 @@ import numpy as np
 import scipy
 import scipy.io as sio
 
+import sys
+sys.path.append('../')
+
 from FlagRep0 import FlagRep, chordal_distance, truncate_svd
 
 from matplotlib import pyplot as plt
@@ -144,13 +147,13 @@ def extract_patches(data, labels, patch_size, class_ids):
 
 if __name__ == '__main__':
 
-    data = scipy.io.loadmat('../data/KSC/KSC.mat')['KSC']
-    labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
+    data = scipy.io.loadmat('../../data/KSC/KSC_corrected.mat')['KSC']
+    labels = scipy.io.loadmat('../../data/KSC/KSC_gt.mat')['KSC_gt']
 
     plt.figure()
     plt.imshow(data[:,:,40], cmap = 'grey')
     plt.axis('off')
-    plt.savefig('../results/KSC_1band.pdf', bbox_inches = 'tight')
+    plt.savefig('../../results/KSC_1band.pdf', bbox_inches = 'tight')
 
     class_names = {1: 'Scrub',
                 2: 'Willow swamp',
@@ -283,6 +286,6 @@ if __name__ == '__main__':
     plt.figure(figsize = (9,3))
     sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
     plt.tight_layout()
-    plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
+    plt.savefig('../../results/KSC.pdf', bbox_inches = 'tight')
 
 

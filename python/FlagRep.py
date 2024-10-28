@@ -91,11 +91,11 @@ class FlagRep(BaseEstimator):
 
                 # get Ri
                 Bs = np.hstack([np.zeros((self.n_, b[j])) for j in range(i)]+[B[j] for j in range(i,k)])
-                R.append(Bs.conj().T @ P.conj().T @ X[-1])
+                R.append(Bs.T @ P.T @ X[-1])
 
                 # compute projection
                 if i < k-1:
-                    P = (np.eye(self.n_) - X[-1] @ X[-1].conj().T) @ P
+                    P = (np.eye(self.n_) - X[-1] @ X[-1].T) @ P
                 
                 
 
@@ -111,7 +111,7 @@ class FlagRep(BaseEstimator):
             self.flag_type_ = np.cumsum(m).astype(int)
 
         # stack R
-        R = np.hstack(R).conj().T
+        R = np.hstack(R).T
 
         return X, R
 
@@ -234,7 +234,7 @@ class FlagRep(BaseEstimator):
             weights = np.zeros(pi)
             for i in range(pi):
                 c = C[:,[i]]
-                sin_sq = c.conj().T @ c - c.conj().T @ U0 @ U0.conj().T @ c
+                sin_sq = c.T @ c - c.T @ U0 @ U0.T @ c
                 sin_sq = np.max(np.array([sin_sq[0,0], 1e-8]))
                 weights[i] = sin_sq**(-1/4)
             
@@ -243,7 +243,7 @@ class FlagRep(BaseEstimator):
 
 
             U1 = self.truncate_svd(C_weighted, n_vecs)
-            err = np.abs(np.linalg.norm(U1 @ U1.conj().T - U0 @ U0.conj().T))
+            err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
             U0 = U1.copy()
             ii+=1
 
