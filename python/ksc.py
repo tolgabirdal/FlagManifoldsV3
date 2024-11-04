@@ -128,7 +128,7 @@ def extract_patches(data, labels, patch_size, class_ids):
 
 if __name__ == '__main__':
 
-    data = scipy.io.loadmat('../data/KSC/KSC_corrected.mat')['KSC']
+    data = scipy.io.loadmat('../data/KSC/KSC.mat')['KSC']
     labels = scipy.io.loadmat('../data/KSC/KSC_gt.mat')['KSC_gt']
 
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     patch_size = 3
     k_values = np.arange(1,25)
 
-    fl_type = [1,7]
+    fl_type = [1,8]
 
     n_trials = 20
 
@@ -253,12 +253,12 @@ if __name__ == '__main__':
                                 data = [[k, method_name, acc, s]])
                 results = pd.concat([results,res])
     
-    # results.to_csv('../results/ksc_robust_res.csv')
+    results.to_csv('../results/ksc_robust_res.csv')
 
     plt.figure(figsize = (9,3))
     sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
     plt.tight_layout()
-    plt.show()
-    # plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
+    # plt.show()
+    plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
 
 

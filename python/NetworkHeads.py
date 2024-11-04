@@ -164,7 +164,7 @@ def ProtoNetHead(query, support, support_labels, n_way, n_shot, normalize=True):
     return logits
     
 
-def FlagNetHead(query1, query2, support1, support2, support_labels, n_way, n_shot, normalize=True):
+def FlagNetHead(query1, query2, support1, support2, support_labels, n_way, n_shot, fl_type = [1,1], normalize=True):
     """
        Constructs the flag representation of each class
        (=1d subspace for 2nd to last hidden layer output and 2nd subspace for last hidden layer output)
@@ -233,15 +233,24 @@ def FlagNetHead(query1, query2, support1, support2, support_labels, n_way, n_sho
         qq2 = query2[batch_idx]
 
         # get subspace for last fcc output
+        # uu2, ss2, _ = torch.svd(class_representatives2[cc].double())
+        # m2 = torch.sum(~torch.isclose(ss2.float(),torch.tensor(0.0)))
+        # uu2 = uu2.float()[:, :m2]
         uu2, _, _ = torch.svd(class_representatives2[cc].double())
-        uu2 = uu2.float()[:, [0]]
+        # uu2 = uu2.float()[:, [0]]
+        uu2 = uu2.float()[:, :fl_type[0]]
         subspace2 = uu2.transpose(0, 1)
+        
         
 
         # get subspace for second to last fcc output
-        proj_cr = (torch.eye(d) - uu2.mm(uu2.transpose(0, 1))).mm(class_representatives1[cc])
+        proj_cr = (torch.eye(d).cuda() - uu2.mm(uu2.transpose(0, 1))).mm(class_representatives1[cc])
+        # uu1, ss1, _ = torch.svd(proj_cr.double())
+        # m1 = torch.sum(~torch.isclose(ss1.float(),torch.tensor(0.0)))
+        # uu1 = uu1.float()[:, :m1]
         uu1, _, _ = torch.svd(proj_cr.double())
-        uu1 = uu1.float()[:, [0]]
+        # uu1 = uu1.float()[:, [0]]
+        uu1 = uu1.float()[:, :fl_type[1]]
         subspace1 = uu1.transpose(0, 1)
 
 

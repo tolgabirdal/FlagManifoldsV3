@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 from matplotlib import pyplot as plt
 
-def chordal_distance(X, Y, Bs_x, Bs_y):
+def chordal_distance(X, Y, Bs_x, Bs_y, manifold = 'Grassmann'):
 
     k = len(Bs_x)
 
@@ -21,9 +21,17 @@ def chordal_distance(X, Y, Bs_x, Bs_y):
             print('sine squared less than 0')
             print(sin_sq)
             sin_sq = 0
-        dist += sin_sq
+        
+        if manifold == 'Grassmann':
+            dist += np.sqrt(sin_sq)
+        elif manifold == 'Flag':
+            dist += sin_sq
+    
+    if manifold == 'Flag':
+        dist = np.sqrt(dist)
 
-    return np.sqrt(dist)
+    return dist
+
 
 
 def truncate_svd(C: np.array, eps_rank: float = 1, zero_tol: float = 1e-8) -> np.array:
