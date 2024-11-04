@@ -187,6 +187,7 @@ if __name__ == '__main__':
     mod_data, mod_labels, Aset = extract_patches(data, labels, patch_size, class_ids)
 
     n,p = mod_data[0].shape
+    print(n)
     n_pts = len(mod_data)
 
     for method_name in methods:
