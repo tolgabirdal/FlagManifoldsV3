@@ -234,9 +234,9 @@ class FlagRep(BaseEstimator):
             weights = np.zeros(pi)
             for i in range(pi):
                 c = C[:,[i]]
-                sin_sq = c.T @ c - c.T @ U0 @ U0.T @ c
-                sin_sq = np.max(np.array([sin_sq[0,0], 1e-8]))
-                weights[i] = sin_sq**(-1/4)
+                sin_sq = np.linalg.norm(c -U0 @ U0.T @ c)
+                sin_sq = np.max(np.array([sin_sq, 1e-8]))
+                weights[i] = sin_sq**(-1/2)
             
             C_weighted =  C @ np.diag(weights)
 

@@ -256,8 +256,12 @@ if __name__ == '__main__':
     
     results.to_csv('../results/ksc_robust_res.csv')
 
+    results['Method'] = results['Method Name']
+
+    plt.rcParams.update({'font.size': 16})
     plt.figure(figsize = (9,3))
-    sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method Name')
+    sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), title="Method")
     plt.tight_layout()
     # plt.show()
     plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
