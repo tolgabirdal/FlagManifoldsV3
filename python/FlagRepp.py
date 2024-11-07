@@ -69,7 +69,8 @@ class FlagRepp(BaseEstimator):
                 if j < i:
                     R[i][j] = np.zeros((m[i], b[j]))
                 elif j == i:
-                    Qi,R[i][i] = self.get_basis(B[i], n_vecs=m[i])
+                    Qi = self.get_basis(B[i], n_vecs=m[i])
+                    R[i][i] = Qi.T @ B[i]
                     Q.append(Qi)
                 else:
                     R[i][j] = Q[i].T @ B[j]
@@ -134,12 +135,11 @@ class FlagRepp(BaseEstimator):
         return obj_val
 
     def truncate_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
-        U,S,V = np.linalg.svd(C, full_matrices=False)
+        U,S,_ = np.linalg.svd(C, full_matrices=False)
         
 
         if n_vecs > 0:
             U = U[:,:n_vecs]
-            R = np.diag(S[:n_vecs]) @ V[:n_vecs,:]
         else:
             S = S/S.max()
 
@@ -169,10 +169,10 @@ class FlagRepp(BaseEstimator):
             if n_vecs > 0:
                 plt.vlines(x = n_vecs, ymin =0, ymax = S.max(), colors = 'tab:red', ls = 'dashed')
 
-        return U, R
+        return U
     
     def truncate_qr(self, C, n_vecs: int = 0) -> np.array:
-        Q,R,_ = scipy.linalg.qr(C, pivoting = True)
+        Q,_,_ = scipy.linalg.qr(C, pivoting = True)
 
         if n_vecs > 0:
             print('warning! QR doesnt support input flag type')
@@ -180,16 +180,14 @@ class FlagRepp(BaseEstimator):
         nonzero_rows = ~np.all(np.isclose(R, 0, atol=self.zero_tol_), axis=1)
         nonzero_row_indices = np.where(nonzero_rows)[0]
         Q = Q[:,nonzero_row_indices]
-        print(R)
-        R = R[nonzero_row_indices,:]
-        print(R)
 
 
-        return Q, R
+
+        return Q
     
     def irls_svd(self, C: np.array, n_vecs: int = 0) -> np.array:
         
-        U0, R0 = self.truncate_svd(C, n_vecs)
+        U0 = self.truncate_svd(C, n_vecs)
         ii=0
         err = 1
 
@@ -208,38 +206,37 @@ class FlagRepp(BaseEstimator):
 
 
 
-            U1, R1 = self.truncate_svd(C_weighted, n_vecs)
+            U1 = self.truncate_svd(C_weighted, n_vecs)
             err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
             U0 = U1.copy()
-            R0 = R1.copy()
             ii+=1
         
         
 
 
-        return U0, R0
+        return U0
 
     def get_basis(self, C, n_vecs: int = 0):
         if self.solver_ == 'svd':
             if len(self.flag_type_) > 0:
-                U, R = self.truncate_svd(C, n_vecs = n_vecs)
+                U = self.truncate_svd(C, n_vecs = n_vecs)
             else:
-                U, R = self.truncate_svd(C)   
+                U = self.truncate_svd(C)   
 
         elif self.solver_ == 'irls svd':
             if len(self.flag_type_) > 0:
-                U, R  = self.irls_svd(C, n_vecs = n_vecs)
+                U  = self.irls_svd(C, n_vecs = n_vecs)
             else:
-                U, R  = self.irls_svd(C)   
+                U  = self.irls_svd(C)   
 
         elif self.solver_ == 'qr':
             if len(self.flag_type_) > 0:
-                U, R = self.truncate_qr(C, n_vecs = n_vecs)
+                U = self.truncate_qr(C, n_vecs = n_vecs)
             else:
-                U, R = self.truncate_qr(C)
+                U = self.truncate_qr(C)
         
         else:
             raise ValueError('Solver must be either qr or svd or irls svd')
         
-        return U, R
+        return U
 
