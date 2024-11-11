@@ -7,7 +7,7 @@ import scipy
 import scipy.io as sio
 
 from FlagRep0 import chordal_distance, truncate_svd
-from FlagRep import FlagRep
+from FlagRepp import FlagRepp
 
 from matplotlib import pyplot as plt
 
@@ -197,7 +197,7 @@ if __name__ == '__main__':
         flag_types[method_name] = []
         for pt in tqdm.tqdm(mod_data):
             if method_name == 'FlagRep':
-                my_flag_rep = FlagRep(Aset=Aset, solver='svd', flag_type = fl_type)
+                my_flag_rep = FlagRepp(Aset=Aset, solver='svd', flag_type = fl_type)
                 flag_pt, _ = my_flag_rep.fit_transform(pt)
                 flag_types[method_name].append(fl_type)
             elif method_name == 'SVD':
@@ -257,11 +257,15 @@ if __name__ == '__main__':
     results.to_csv('../results/ksc_robust_res.csv')
 
     results['Method'] = results['Method Name']
+    results.sort_values(by='Method')
 
     plt.rcParams.update({'font.size': 16})
     plt.figure(figsize = (9,3))
-    sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method')
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), title="Method")
+    sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method', 
+                 palette={'FlagRep':'tab:blue', 'SVD':'tab:green', 'QR': 'tab:red'},
+                 style = 'Method')
+    # Position the legend inside the plot (upper-right corner)
+    plt.legend(loc='upper right', bbox_to_anchor=(0.6, 0.6), title="")
     plt.tight_layout()
     # plt.show()
     plt.savefig('../results/KSC.pdf', bbox_inches = 'tight')
