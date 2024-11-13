@@ -178,7 +178,7 @@ if __name__ == '__main__':
         "#c49c94",  # Light Brown
     ]
 
-    methods = ['FlagRep', 'QR', 'SVD',  'Euclidean']
+    methods = ['FD', 'QR', 'SVD',  'Euclidean']
 
     dist_mats = {}
     flag_data = {}
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     mod_data, mod_labels, Aset = extract_patches(data, labels, patch_size, class_ids)
 
     n,p = mod_data[0].shape
-    print(n)
+
     n_pts = len(mod_data)
 
     for method_name in methods:
@@ -196,7 +196,7 @@ if __name__ == '__main__':
         flag_data[method_name] = []
         flag_types[method_name] = []
         for pt in tqdm.tqdm(mod_data):
-            if method_name == 'FlagRep':
+            if method_name == 'FD':
                 my_flag_rep = FlagRepp(Aset=Aset, solver='svd', flag_type = fl_type)
                 flag_pt, _ = my_flag_rep.fit_transform(pt)
                 flag_types[method_name].append(fl_type)
@@ -262,7 +262,7 @@ if __name__ == '__main__':
     plt.rcParams.update({'font.size': 16})
     plt.figure(figsize = (9,3))
     sns.lineplot(data = results, x = 'k', y = 'Accuracy', hue = 'Method', 
-                 palette={'FlagRep':'tab:blue', 'SVD':'tab:green', 'QR': 'tab:red'},
+                 palette={'FD':'tab:blue', 'SVD':'tab:green', 'QR': 'tab:red'},
                  style = 'Method')
     # Position the legend inside the plot (upper-right corner)
     plt.legend(loc='upper right', bbox_to_anchor=(0.6, 0.6), title="")

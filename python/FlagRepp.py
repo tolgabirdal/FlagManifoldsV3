@@ -23,9 +23,7 @@ class FlagRepp(BaseEstimator):
             raise ValueError('flag_type and Aset lengths are not equal')
 
     def flag_type(self):
-        return self.flag_type_
-    
-    
+        return self.flag_type_ 
 
     def fit_transform(self, D):
         """
@@ -210,8 +208,6 @@ class FlagRepp(BaseEstimator):
             err = np.abs(np.linalg.norm(U1 @ U1.T - U0 @ U0.T))
             U0 = U1.copy()
             ii+=1
-        
-        
 
 
         return U0
