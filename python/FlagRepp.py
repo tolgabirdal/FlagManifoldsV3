@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 from matplotlib import pyplot as plt
 from sklearn.base import BaseEstimator
-from GGD import ggd
+
 
 class FlagRepp(BaseEstimator):
     def __init__(self, Aset: list = [], flag_type: list = [], 
