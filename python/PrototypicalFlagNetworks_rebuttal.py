@@ -1,13 +1,12 @@
 import torch
 from torch import nn
-from NetworkHeads_rebuttal import ProtoNetHead, SubspaceNetHead
+from NetworkHeads_rebuttal import FlagNetHead
 
-
-class PrototypicalNetworks(nn.Module):
-    def __init__(self, backbone: nn.Module, head: str):
-        super(PrototypicalNetworks, self).__init__()
+class PrototypicalFlagNetworks(nn.Module):
+    def __init__(self, backbone: nn.Module, fl_type = [1,1]):
+        super(PrototypicalFlagNetworks, self).__init__()
         self.backbone = backbone
-        self.head = head
+        self.fl_type = fl_type
 
     def forward(
         self,
@@ -27,11 +26,6 @@ class PrototypicalNetworks(nn.Module):
         # Infer the number shots from the labels of the support set
         n_shot = len(torch.where(support_labels==support_labels[0])[0])
 
-        if self.head == 'ProtoNet':
-            scores = ProtoNetHead(z_query1, z_query2, z_support1, z_support2, support_labels, n_way, n_shot)
-        elif self.head == 'SubspaceNet':
-            scores = SubspaceNetHead(z_query1, z_query2, z_support1, z_support2, support_labels, n_way, n_shot)
-        else:
-            print('head not recognized')
+        scores = FlagNetHead(z_query1, z_query2, z_support1, z_support2, support_labels, n_way, n_shot, self.fl_type)
 
         return scores
