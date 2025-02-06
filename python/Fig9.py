@@ -6,8 +6,8 @@ import numpy as np
 import scipy
 import scipy.io as sio
 
-from FlagRep0 import chordal_distance, truncate_svd
-from FlagRepp import FlagRepp
+from utils import chordal_distance, truncate_svd
+from FD import FD
 
 from matplotlib import pyplot as plt
 
@@ -197,11 +197,11 @@ if __name__ == '__main__':
         flag_types[method_name] = []
         for pt in tqdm.tqdm(mod_data):
             if method_name == 'FD':
-                my_flag_rep = FlagRepp(Aset=Aset, solver='svd', flag_type = fl_type)
+                my_flag_rep = FD(Aset=Aset, solver='svd', flag_type = fl_type)
                 flag_pt, _ = my_flag_rep.fit_transform(pt)
                 flag_types[method_name].append(fl_type)
             elif method_name == 'SVD':
-                flag_pt = truncate_svd(pt)[:,:fl_type[-1]]
+                flag_pt = truncate_svd(pt,fl_type[-1])
                 flag_types[method_name].append(fl_type)
             elif method_name == 'QR':
                 Q,_ = np.linalg.qr(pt)
@@ -210,7 +210,6 @@ if __name__ == '__main__':
             elif method_name == 'Euclidean':
                 flag_pt = flag_pt.flatten()
             flag_data[method_name].append(flag_pt)
-
 
         #make distance matrices
         dist_mats[method_name] = np.zeros((n_pts,n_pts))
@@ -222,7 +221,7 @@ if __name__ == '__main__':
                 if method_name == 'Euclidean':
                     dist = np.linalg.norm(x-y)
                 else:
-                    dist = chordal_distance(x, y, Bs, Bs)
+                    dist = chordal_distance(x, y, Bs, Bs, manifold='Grassmann')
                 dist_mats[method_name][i,j] = dist
                 dist_mats[method_name][j,i] = dist
             

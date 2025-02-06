@@ -4,13 +4,12 @@ from matplotlib import pyplot as plt
 from sklearn.base import BaseEstimator
 
 
-class FlagRepp(BaseEstimator):
+class FD(BaseEstimator):
     def __init__(self, Aset: list = [], flag_type: list = [], 
                  eps_rank: float = 1, zero_tol: float = 1e-10,
                  solver = 'svd', plot_eigs = False):
 
         self.Bset_ = [Aset[0]]+[np.setdiff1d(Aset[i],Aset[i-1])for i in range(1,len(Aset))]
-        # self.Bset_ = [Aset[-1]]+[np.setdiff1d(Aset[-1],Aset[i])for i in range(len(Aset)-1)]
         self.eps_rank_ = eps_rank
         self.zero_tol_ = zero_tol
         self.flag_type_ = flag_type
@@ -140,18 +139,6 @@ class FlagRepp(BaseEstimator):
             U = U[:,:n_vecs]
         else:
             S = S/S.max()
-
-            # idea from here: https://inria.hal.science/hal-02326070/file/demo.pdf
-            # n_vecs = np.sum(np.array([np.linalg.norm(S[-k:]) for k in range(len(S))]) >= 1e-1)
-            # U = U[:,:n_vecs]
-
-
-            # eigengap thresholding
-            # S_gaps = -np.diff(S)
-            # for s_gap in S_gaps:
-            #     if s_gap >= 1e-3:
-            #         n_vecs +=1
-            # U = U[:,:n_vecs]
 
             # pca-inspired
             nnz_ids = ~np.isclose(S, 0, atol=self.zero_tol_)
